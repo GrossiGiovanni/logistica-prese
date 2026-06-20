@@ -1,0 +1,246 @@
+// Prisma schema — MVP pianificazione prese/ritiri logistici
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum VehicleType {
+  VAN
+  TRUCK
+  MOTRICE
+}
+
+enum CostLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum PickupSourceType {
+  SPOT
+  RECURRING
+}
+
+enum PickupStatus {
+  DRAFT
+  READY
+  PLANNED
+  CANCELLED
+}
+
+enum TimeWindow {
+  MORNING
+  AFTERNOON
+  ANYTIME
+  SPECIFIC
+}
+
+enum Priority {
+  NORMAL
+  HIGH
+  MANDATORY
+}
+
+enum RouteShift {
+  MORNING
+  AFTERNOON
+  FULL_DAY
+}
+
+enum RouteStatus {
+  DRAFT
+  CONFIRMED
+}
+
+// =============================================================================
+// MODELS
+// =============================================================================
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  vatNumber String?
+  phone     String?
+  email     String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  addresses        Address[]
+  pickups          Pickup[]
+  recurringPickups RecurringPickup[]
+
+  @@index([name])
+}
+
+model Address {
+  id         String   @id @default(cuid())
+  customerId String
+  label      String?
+  street     String
+  city       String
+  province   String
+  postalCode String?
+  country    String   @default("IT")
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  customer         Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  pickups          Pickup[]
+  recurringPickups RecurringPickup[]
+
+  @@index([customerId])
+  @@index([city])
+}
+
+model Driver {
+  id               String   @id @default(cuid())
+  name             String
+  phone            String?
+  defaultVehicleId String?
+  active           Boolean  @default(true)
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  defaultVehicle Vehicle? @relation("DriverDefaultVehicle", fields: [defaultVehicleId], references: [id], onDelete: SetNull)
+  routes         Route[]
+
+  @@index([active])
+}
+
+model Vehicle {
+  id              String      @id @default(cuid())
+  name            String
+  plate           String?
+  vehicleType     VehicleType @default(VAN)
+  capacityPallets Int?
+  hasTailLift     Boolean     @default(false)
+  costLevel       CostLevel   @default(MEDIUM)
+  active          Boolean     @default(true)
+  notes           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  routes        Route[]
+  defaultForDrivers Driver[] @relation("DriverDefaultVehicle")
+
+  @@index([active])
+  @@index([vehicleType])
+}
+
+model Pickup {
+  id                String           @id @default(cuid())
+  pickupDate        DateTime         @db.Date
+  customerId        String
+  addressId         String
+  sourceType        PickupSourceType @default(SPOT)
+  status            PickupStatus     @default(DRAFT)
+  timeWindow        TimeWindow       @default(ANYTIME)
+  timeFrom          String?
+  timeTo            String?
+  pallets           Int?
+  colli             Int?
+  weightKg          Float?
+  volumeM3          Float?
+  requiresTailLift  Boolean          @default(false)
+  requiresMotrice   Boolean          @default(false)
+  priority          Priority         @default(NORMAL)
+  rawNotes          String?
+  internalNotes     String?
+  recurringPickupId String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  customer        Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  address         Address          @relation(fields: [addressId], references: [id], onDelete: Cascade)
+  recurringPickup RecurringPickup? @relation(fields: [recurringPickupId], references: [id], onDelete: SetNull)
+  routeStops      RouteStop[]
+
+  // Anti-duplicato: una sola presa generata per ricorrenza+data
+  @@unique([pickupDate, recurringPickupId])
+  @@index([pickupDate])
+  @@index([status])
+  @@index([sourceType])
+  @@index([customerId])
+}
+
+model RecurringPickup {
+  id                     String     @id @default(cuid())
+  customerId             String
+  addressId              String
+  active                 Boolean    @default(true)
+  monday                 Boolean    @default(false)
+  tuesday                Boolean    @default(false)
+  wednesday              Boolean    @default(false)
+  thursday               Boolean    @default(false)
+  friday                 Boolean    @default(false)
+  saturday               Boolean    @default(false)
+  sunday                 Boolean    @default(false)
+  defaultTimeWindow      TimeWindow @default(ANYTIME)
+  defaultTimeFrom        String?
+  defaultTimeTo          String?
+  defaultPallets         Int?
+  defaultColli           Int?
+  defaultWeightKg        Float?
+  defaultVolumeM3        Float?
+  defaultRequiresTailLift Boolean   @default(false)
+  defaultRequiresMotrice Boolean    @default(false)
+  defaultPriority        Priority   @default(NORMAL)
+  defaultNotes           String?
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  address  Address  @relation(fields: [addressId], references: [id], onDelete: Cascade)
+  pickups  Pickup[]
+
+  @@index([active])
+  @@index([customerId])
+}
+
+model Route {
+  id        String      @id @default(cuid())
+  routeDate DateTime    @db.Date
+  driverId  String?
+  vehicleId String?
+  shift     RouteShift  @default(FULL_DAY)
+  status    RouteStatus @default(DRAFT)
+  notes     String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  driver  Driver?     @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  vehicle Vehicle?    @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  stops   RouteStop[]
+
+  @@index([routeDate])
+  @@index([status])
+}
+
+model RouteStop {
+  id        String   @id @default(cuid())
+  routeId   String
+  pickupId  String
+  sequence  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  route  Route  @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  pickup Pickup @relation(fields: [pickupId], references: [id], onDelete: Cascade)
+
+  @@unique([routeId, pickupId])
+  @@index([routeId])
+  @@index([pickupId])
+}
