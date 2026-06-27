@@ -24,6 +24,12 @@ import { routeShiftLabels, priorityLabels, routeLabel } from "@/lib/labels";
 import { formatDateIt, tomorrowInputValue, parseDateOnly } from "@/lib/dates";
 import { UnassignedFilters } from "@/features/pickups/UnassignedFilters";
 import { PickupShiftSelect } from "@/features/pickups/PickupShiftSelect";
+import { WhatsAppButton } from "@/features/routes/WhatsAppButton";
+import {
+  buildWhatsappMessage,
+  isValidWhatsappNumber,
+  whatsappDigits,
+} from "@/features/routes/whatsapp-message";
 import { getPianFilters, getOpDate } from "@/lib/persisted-filters";
 import type { TimeWindow, Priority } from "@prisma/client";
 
@@ -188,7 +194,21 @@ export default async function PianificazionePage({
                           {routeTotalCost(r) != null ? ` · ${formatEuro(routeTotalCost(r))}` : ""}
                         </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-2">
+                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                        {r.driver?.whatsappEnabled && r.stops.length > 0 ? (
+                          isValidWhatsappNumber(r.driver.phone) ? (
+                            <WhatsAppButton
+                              routeId={r.id}
+                              digits={whatsappDigits(r.driver.phone)}
+                              message={buildWhatsappMessage(r)}
+                              compact
+                            />
+                          ) : (
+                            <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-700">
+                              Numero WhatsApp mancante
+                            </span>
+                          )
+                        ) : null}
                         <Link href={`/giri/${r.id}`} className="btn-secondary">Apri giro</Link>
                         <form action={deleteRoute}>
                           <input type="hidden" name="id" value={r.id} />

@@ -27,6 +27,12 @@ import {
 import { routeTotalCost, formatEuro } from "@/lib/costs";
 import { addressToQuery } from "@/lib/distance";
 import { RouteMapEmbed } from "@/features/map/RouteMapEmbed";
+import { WhatsAppButton } from "@/features/routes/WhatsAppButton";
+import {
+  buildWhatsappMessage,
+  isValidWhatsappNumber,
+  whatsappDigits,
+} from "@/features/routes/whatsapp-message";
 import { timeWindowLabels, priorityLabels, routeLabel } from "@/lib/labels";
 import { formatDateIt, toDateInputValue } from "@/lib/dates";
 
@@ -55,6 +61,10 @@ export default async function GiroDettaglioPage({
 
   const stopAddresses = route.stops.map((s) => addressToQuery(s.pickup.address));
   const mapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
+
+  // WhatsApp: visibile solo con autista WhatsApp-abilitato e almeno una presa.
+  const waEnabled = Boolean(route.driver?.whatsappEnabled) && route.stops.length > 0;
+  const waValidNumber = isValidWhatsappNumber(route.driver?.phone);
 
   return (
     <div>
@@ -119,6 +129,27 @@ export default async function GiroDettaglioPage({
           <span className="font-semibold text-slate-900">{formatEuro(totalCost)}</span>
         </div>
       </div>
+
+      {waEnabled ? (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          {waValidNumber ? (
+            <WhatsAppButton
+              routeId={route.id}
+              digits={whatsappDigits(route.driver?.phone)}
+              message={buildWhatsappMessage(route)}
+            />
+          ) : (
+            <span className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+              ⚠️ Numero WhatsApp mancante (aggiungilo nella scheda autista)
+            </span>
+          )}
+          {route.lastWhatsappSentAt ? (
+            <span className="text-xs text-slate-400">
+              Ultimo invio: {formatDateIt(route.lastWhatsappSentAt)}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
       <section className="mb-6">
         <h2 className="mb-2 text-base font-semibold text-slate-900">Percorso del giro</h2>

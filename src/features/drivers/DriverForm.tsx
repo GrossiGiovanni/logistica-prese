@@ -31,8 +31,13 @@ export function DriverForm({
         <Field label="Codice" htmlFor="code" error={errors?.code} hint="Codice autista (es. 13130)">
           <input id="code" name="code" defaultValue={driver?.code ?? ""} className="field-input" />
         </Field>
-        <Field label="Telefono" htmlFor="phone" error={errors?.phone}>
-          <input id="phone" name="phone" defaultValue={driver?.phone ?? ""} className="field-input" />
+        <Field label="Telefono / WhatsApp" htmlFor="phone" error={errors?.phone} hint="Formato internazionale, es. +39 333 1234567">
+          <input id="phone" name="phone" defaultValue={driver?.phone ?? ""} placeholder="+39..." className="field-input" />
+        </Field>
+        <Field label="WhatsApp">
+          <div className="pt-2">
+            <CheckboxField label="Abilita invio giri su WhatsApp" name="whatsappEnabled" defaultChecked={driver?.whatsappEnabled ?? true} />
+          </div>
         </Field>
         <Field label="Mezzo predefinito" htmlFor="defaultVehicleId" error={errors?.defaultVehicleId}>
           <select id="defaultVehicleId" name="defaultVehicleId" defaultValue={driver?.defaultVehicleId ?? ""} className="field-input">

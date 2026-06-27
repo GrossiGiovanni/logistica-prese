@@ -99,6 +99,14 @@ export async function updateRoute(
   return { ok: true };
 }
 
+/** Registra l'ultimo invio del giro su WhatsApp (storico). */
+export async function markWhatsappSent(formData: FormData): Promise<void> {
+  const id = formData.get("id") as string;
+  if (!id) return;
+  await prisma.route.update({ where: { id }, data: { lastWhatsappSentAt: new Date() } });
+  revalidateRoutes(id);
+}
+
 /** Ricalcola manualmente i km del giro (bottone "Ricalcola KM"). */
 export async function recalculateRouteKm(formData: FormData): Promise<void> {
   const id = formData.get("id") as string;

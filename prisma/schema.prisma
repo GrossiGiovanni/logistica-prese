@@ -111,7 +111,8 @@ model Driver {
   id               String   @id @default(cuid())
   name             String
   code             String?
-  phone            String?
+  phone            String? // Telefono/WhatsApp in formato internazionale (es. +39...)
+  whatsappEnabled  Boolean  @default(true)
   defaultVehicleId String?
   active           Boolean  @default(true)
   notes            String?
@@ -234,6 +235,7 @@ model Route {
   departureTime String? // Ora partenza (HH:MM)
   returnTime    String? // Ora rientro (HH:MM)
   km            Float? // Km percorsi (inserimento manuale)
+  lastWhatsappSentAt DateTime? // Storico ultimo invio del giro su WhatsApp
   notes         String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt

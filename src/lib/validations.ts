@@ -98,6 +98,7 @@ export const driverSchema = z.object({
   name: requiredString,
   code: optionalString,
   phone: optionalString,
+  whatsappEnabled: checkbox,
   defaultVehicleId: optionalString,
   active: checkbox,
   notes: optionalString,
