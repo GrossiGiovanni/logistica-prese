@@ -11,6 +11,7 @@ import { listUnassignedPickups } from "@/features/pickups/queries";
 import { assignPickupToRoute } from "@/features/routes/actions";
 import { GenerateRecurringForm } from "@/features/recurring-pickups/GenerateRecurringForm";
 import { ensureRecurringForDate } from "@/features/recurring-pickups/generate";
+import { ensureDailyRoutes } from "@/features/routes/ensure-daily";
 import {
   routeTotalPallets,
   routeUsesMotrice,
@@ -20,6 +21,9 @@ import {
 import { routeTotalCost, formatEuro } from "@/lib/costs";
 import { routeShiftLabels, timeWindowLabels, priorityLabels } from "@/lib/labels";
 import { formatDateIt, tomorrowInputValue, parseDateOnly } from "@/lib/dates";
+import { UnassignedFilters } from "@/features/pickups/UnassignedFilters";
+import { getPianFilters, getOpDate } from "@/lib/persisted-filters";
+import type { TimeWindow, Priority } from "@prisma/client";
 
 export default async function PianificazionePage({
   searchParams,
@@ -27,16 +31,25 @@ export default async function PianificazionePage({
   searchParams: Promise<{ date?: string }>;
 }) {
   const { date } = await searchParams;
-  const selectedDate = date ?? tomorrowInputValue();
+  const [saved, opDate] = await Promise.all([getPianFilters(), getOpDate()]);
+  const { q, tw, prio } = saved;
+  const selectedDate = date ?? opDate ?? tomorrowInputValue();
   const redirectTo = `/pianificazione?date=${selectedDate}`;
 
-  // Materializza le prese fisse del giorno (idempotente, solo oggi/futuro)
-  // così le ricorrenze compaiono senza dover cliccare "Genera prese fisse".
-  await ensureRecurringForDate(selectedDate);
+  // Materializza prese fisse e giri predefiniti del giorno (idempotente, solo
+  // oggi/futuro): le ricorrenze e i giri per autista compaiono senza azioni manuali.
+  await Promise.all([
+    ensureRecurringForDate(selectedDate),
+    ensureDailyRoutes(selectedDate),
+  ]);
 
   const [{ routes, kpi }, unassigned] = await Promise.all([
     getDailyStats(selectedDate),
-    listUnassignedPickups(selectedDate),
+    listUnassignedPickups(selectedDate, {
+      search: q || undefined,
+      timeWindow: (tw as TimeWindow) || undefined,
+      priority: (prio as Priority) || undefined,
+    }),
   ]);
 
   return (
@@ -73,15 +86,21 @@ export default async function PianificazionePage({
           <h2 className="mb-2 text-base font-semibold text-slate-900">
             Prese non assegnate ({unassigned.length})
           </h2>
+          <UnassignedFilters date={selectedDate} current={{ q, tw, prio }} />
           {unassigned.length === 0 ? (
             <div className="card px-4 py-8 text-center text-sm text-slate-500">
-              Nessuna presa da assegnare. Genera le prese fisse o creane una spot.
+              Nessuna presa da assegnare con i filtri attuali.
             </div>
           ) : (
             <ul className="space-y-2">
               {unassigned.map((p) => (
                 <li key={p.id} className="card p-3">
                   <div className="flex flex-wrap items-center gap-2">
+                    {p.pickupNumber ? (
+                      <span className="font-mono text-xs font-semibold text-brand-700">
+                        {p.pickupNumber}
+                      </span>
+                    ) : null}
                     <Link href={`/prese/${p.id}/modifica`} className="font-medium text-slate-800 hover:underline">
                       {p.customer.name}
                     </Link>

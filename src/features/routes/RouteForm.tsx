@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import type { Route, Driver, Vehicle } from "@prisma/client";
 import { createRoute, updateRoute } from "./actions";
 import { FormSection, Field } from "@/components/forms/FormSection";
@@ -16,13 +16,36 @@ export function RouteForm({
   defaultDate,
 }: {
   route?: Route;
-  drivers: Pick<Driver, "id" | "name">[];
+  drivers: Pick<Driver, "id" | "name" | "defaultVehicleId">[];
   vehicles: Pick<Vehicle, "id" | "name" | "vehicleType">[];
   defaultDate: string;
 }) {
   const action = route ? updateRoute : createRoute;
   const [state, formAction] = useActionState<ActionResult | null, FormData>(action, null);
   const errors = state && !state.ok ? state.fieldErrors : undefined;
+
+  // Abbinamento fisso autista <-> mezzo: scelto l'uno, propone l'altro.
+  const driverToVehicle = new Map(drivers.map((d) => [d.id, d.defaultVehicleId ?? ""]));
+  const vehicleToDriver = new Map<string, string>();
+  for (const d of drivers) {
+    if (d.defaultVehicleId && !vehicleToDriver.has(d.defaultVehicleId)) {
+      vehicleToDriver.set(d.defaultVehicleId, d.id);
+    }
+  }
+
+  const [driverId, setDriverId] = useState(route?.driverId ?? "");
+  const [vehicleId, setVehicleId] = useState(route?.vehicleId ?? "");
+
+  function onDriverChange(next: string) {
+    setDriverId(next);
+    const v = driverToVehicle.get(next);
+    if (v) setVehicleId(v); // propone il mezzo predefinito dell'autista
+  }
+  function onVehicleChange(next: string) {
+    setVehicleId(next);
+    const d = vehicleToDriver.get(next);
+    if (d) setDriverId(d); // propone l'autista associato al mezzo
+  }
 
   return (
     <form action={formAction} className="space-y-4">
@@ -46,16 +69,16 @@ export function RouteForm({
             ))}
           </select>
         </Field>
-        <Field label="Autista" htmlFor="driverId" error={errors?.driverId}>
-          <select id="driverId" name="driverId" defaultValue={route?.driverId ?? ""} className="field-input">
+        <Field label="Autista" htmlFor="driverId" error={errors?.driverId} hint="Scelto l'autista, il mezzo predefinito viene proposto in automatico.">
+          <select id="driverId" name="driverId" value={driverId} onChange={(e) => onDriverChange(e.target.value)} className="field-input">
             <option value="">Nessuno</option>
             {drivers.map((d) => (
               <option key={d.id} value={d.id}>{d.name}</option>
             ))}
           </select>
         </Field>
-        <Field label="Mezzo" htmlFor="vehicleId" error={errors?.vehicleId}>
-          <select id="vehicleId" name="vehicleId" defaultValue={route?.vehicleId ?? ""} className="field-input">
+        <Field label="Mezzo" htmlFor="vehicleId" error={errors?.vehicleId} hint="Scelto il mezzo, viene proposto l'autista associato.">
+          <select id="vehicleId" name="vehicleId" value={vehicleId} onChange={(e) => onVehicleChange(e.target.value)} className="field-input">
             <option value="">Nessuno</option>
             {vehicles.map((v) => (
               <option key={v.id} value={v.id}>

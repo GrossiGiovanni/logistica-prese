@@ -8,6 +8,7 @@ import { DateSelector } from "@/components/ui/DateSelector";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getDailyStats } from "@/features/dashboard/queries";
 import { ensureRecurringForDate } from "@/features/recurring-pickups/generate";
+import { getOpDate } from "@/lib/persisted-filters";
 import { hasMissingData, routeTotalPallets, routeUsesMotrice } from "@/lib/warnings";
 import { routeTotalCost, formatEuro } from "@/lib/costs";
 import { routeShiftLabels, timeWindowLabels } from "@/lib/labels";
@@ -19,7 +20,7 @@ export default async function DashboardPage({
   searchParams: Promise<{ date?: string }>;
 }) {
   const { date } = await searchParams;
-  const selectedDate = date ?? tomorrowInputValue();
+  const selectedDate = date ?? (await getOpDate()) ?? tomorrowInputValue();
 
   await ensureRecurringForDate(selectedDate);
 

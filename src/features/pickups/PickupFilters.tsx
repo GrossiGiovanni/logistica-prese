@@ -4,8 +4,9 @@ import {
   timeWindowLabels,
   toOptions,
 } from "@/lib/labels";
+import { applyPreseFilters, clearPreseFilters } from "./filter-actions";
 
-/** Barra filtri prese — form GET, funziona senza JS. */
+/** Barra filtri prese — i filtri vengono salvati in un cookie e persistono tra le pagine. */
 export function PickupFiltersBar({
   current,
 }: {
@@ -18,7 +19,7 @@ export function PickupFiltersBar({
   };
 }) {
   return (
-    <form method="get" className="card mb-4 flex flex-wrap items-end gap-3 p-3">
+    <form action={applyPreseFilters} className="card mb-4 flex flex-wrap items-end gap-3 p-3">
       <div>
         <label className="field-label">Data</label>
         <input type="date" name="date" defaultValue={current.date ?? ""} className="field-input w-auto" />
@@ -51,12 +52,12 @@ export function PickupFiltersBar({
         </select>
       </div>
       <div className="grow">
-        <label className="field-label">Cerca (cliente / località)</label>
-        <input type="text" name="search" defaultValue={current.search ?? ""} placeholder="Es. Milano, Alimentari…" className="field-input" />
+        <label className="field-label">Cerca (cliente / località / n. presa)</label>
+        <input type="text" name="search" defaultValue={current.search ?? ""} placeholder="Es. Magis, Milano, 9004641…" className="field-input" />
       </div>
       <div className="flex gap-2">
         <button type="submit" className="btn-primary">Filtra</button>
-        <a href="/prese" className="btn-secondary">Azzera</a>
+        <button type="submit" formAction={clearPreseFilters} className="btn-secondary">Azzera</button>
       </div>
     </form>
   );

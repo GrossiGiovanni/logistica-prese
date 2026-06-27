@@ -23,6 +23,10 @@ export function DateSelector({
     const params = new URLSearchParams(searchParams.toString());
     if (next) params.set(paramName, next);
     else params.delete(paramName);
+    // Memorizza la data operativa condivisa tra le pagine (persistente).
+    if (paramName === "date" && next) {
+      document.cookie = `op_date=${next}; path=/; max-age=31536000; SameSite=Lax`;
+    }
     router.push(`${pathname}?${params.toString()}`);
   }
 

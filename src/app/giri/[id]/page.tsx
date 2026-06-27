@@ -149,6 +149,11 @@ export default async function GiroDettaglioPage({
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
+                        {stop.pickup.pickupNumber ? (
+                          <span className="font-mono text-xs font-semibold text-brand-700">
+                            {stop.pickup.pickupNumber}
+                          </span>
+                        ) : null}
                         <span className="font-medium text-slate-800">
                           {stop.pickup.customer.name}
                         </span>

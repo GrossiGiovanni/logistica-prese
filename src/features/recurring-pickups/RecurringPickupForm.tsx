@@ -89,7 +89,14 @@ export function RecurringPickupForm({
                 key={d.name}
                 label={d.label}
                 name={d.name}
-                defaultChecked={Boolean(recurring?.[d.name] ?? false)}
+                // Nuova ricorrenza: lun-ven preselezionati (giorni lavorativi).
+                defaultChecked={
+                  recurring
+                    ? Boolean(recurring[d.name])
+                    : ["monday", "tuesday", "wednesday", "thursday", "friday"].includes(
+                        d.name as string,
+                      )
+                }
               />
             ))}
           </div>

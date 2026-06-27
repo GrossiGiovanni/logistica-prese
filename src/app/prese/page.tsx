@@ -11,6 +11,7 @@ import { PickupFiltersBar } from "@/features/pickups/PickupFilters";
 import { hasMissingData } from "@/lib/warnings";
 import { pickupSourceLabels, timeWindowLabels, priorityLabels } from "@/lib/labels";
 import { formatDateIt } from "@/lib/dates";
+import { getPreseFilters, getOpDate } from "@/lib/persisted-filters";
 import type { PickupStatus, PickupSourceType, TimeWindow } from "@prisma/client";
 
 export default async function PresePage({
@@ -19,16 +20,29 @@ export default async function PresePage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const sp = await searchParams;
+  const [saved, opDate] = await Promise.all([getPreseFilters(), getOpDate()]);
+  // I filtri persistono nei cookie; la data può arrivare anche dall'URL.
   const filters = {
-    date: sp.date || undefined,
-    status: (sp.status as PickupStatus) || undefined,
-    sourceType: (sp.sourceType as PickupSourceType) || undefined,
-    timeWindow: (sp.timeWindow as TimeWindow) || undefined,
-    search: sp.search || undefined,
+    date: sp.date || opDate || undefined,
+    status: (saved.status as PickupStatus) || undefined,
+    sourceType: (saved.sourceType as PickupSourceType) || undefined,
+    timeWindow: (saved.timeWindow as TimeWindow) || undefined,
+    search: saved.search || undefined,
   };
   const pickups = await listPickups(filters);
 
   const columns: Column<PickupWithRelations>[] = [
+    {
+      header: "N. presa",
+      cell: (p) =>
+        p.pickupNumber ? (
+          <span className="whitespace-nowrap font-mono text-xs font-semibold text-slate-800">
+            {p.pickupNumber}
+          </span>
+        ) : (
+          "—"
+        ),
+    },
     { header: "Data", cell: (p) => <span className="whitespace-nowrap">{formatDateIt(p.pickupDate)}</span> },
     {
       header: "Cliente / Località",
@@ -89,7 +103,7 @@ export default async function PresePage({
         description="Tutte le prese/ritiri"
         action={{ href: "/prese/nuova", label: "Nuova presa" }}
       />
-      <PickupFiltersBar current={sp} />
+      <PickupFiltersBar current={filters} />
       <DataTable
         columns={columns}
         rows={pickups}

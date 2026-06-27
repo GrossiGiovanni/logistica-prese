@@ -6,6 +6,8 @@ import { RouteStatusBadge } from "@/components/badges/StatusBadge";
 import { RouteWarningBadges } from "@/components/badges/WarningBadge";
 import { DateSelector } from "@/components/ui/DateSelector";
 import { listRoutes } from "@/features/routes/queries";
+import { ensureDailyRoutes } from "@/features/routes/ensure-daily";
+import { getOpDate } from "@/lib/persisted-filters";
 import { routeTotalPallets, routeUsesMotrice, getRouteWarnings } from "@/lib/warnings";
 import { routeShiftLabels } from "@/lib/labels";
 import { formatDateIt, tomorrowInputValue, parseDateOnly } from "@/lib/dates";
@@ -16,7 +18,8 @@ export default async function GiriPage({
   searchParams: Promise<{ date?: string }>;
 }) {
   const { date } = await searchParams;
-  const selectedDate = date ?? tomorrowInputValue();
+  const selectedDate = date ?? (await getOpDate()) ?? tomorrowInputValue();
+  await ensureDailyRoutes(selectedDate);
   const routes = await listRoutes(selectedDate);
 
   return (

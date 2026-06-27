@@ -29,6 +29,7 @@ export function listPickups(filters: PickupFilters = {}) {
     where.OR = [
       { customer: { name: { contains: filters.search, mode: "insensitive" } } },
       { address: { city: { contains: filters.search, mode: "insensitive" } } },
+      { pickupNumber: { contains: filters.search, mode: "insensitive" } },
     ];
   }
 
@@ -87,14 +88,30 @@ export async function listPickupsForMap(date: string): Promise<PickupMapPoint[]>
   }));
 }
 
+export type UnassignedFilters = {
+  search?: string;
+  timeWindow?: TimeWindow;
+  priority?: "NORMAL" | "HIGH" | "MANDATORY";
+};
+
 /** Prese assegnabili a un giro per una certa data: READY o DRAFT, non annullate, non già pianificate altrove. */
-export function listUnassignedPickups(date: string) {
+export function listUnassignedPickups(date: string, filters: UnassignedFilters = {}) {
+  const where: Prisma.PickupWhereInput = {
+    pickupDate: parseDateOnly(date),
+    status: { in: ["READY", "DRAFT"] },
+    routeStops: { none: {} },
+  };
+  if (filters.timeWindow) where.timeWindow = filters.timeWindow;
+  if (filters.priority) where.priority = filters.priority;
+  if (filters.search) {
+    where.OR = [
+      { customer: { name: { contains: filters.search, mode: "insensitive" } } },
+      { address: { city: { contains: filters.search, mode: "insensitive" } } },
+      { pickupNumber: { contains: filters.search, mode: "insensitive" } },
+    ];
+  }
   return prisma.pickup.findMany({
-    where: {
-      pickupDate: parseDateOnly(date),
-      status: { in: ["READY", "DRAFT"] },
-      routeStops: { none: {} },
-    },
+    where,
     include: pickupInclude,
     orderBy: [{ priority: "desc" }, { timeWindow: "asc" }],
   });
