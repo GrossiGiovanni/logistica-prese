@@ -49,7 +49,7 @@ const dateOnly = z
 // Enums
 // ---------------------------------------------------------------------------
 
-const vehicleType = z.enum(["VAN", "TRUCK", "MOTRICE"]);
+const vehicleType = z.enum(["VAN", "TRUCK", "BILICO", "MOTRICE"]);
 const costLevel = z.enum(["LOW", "MEDIUM", "HIGH"]);
 const pickupSourceType = z.enum(["SPOT", "RECURRING"]);
 const pickupStatus = z.enum(["DRAFT", "READY", "PLANNED", "CANCELLED"]);
@@ -96,6 +96,7 @@ export type AddressInput = z.infer<typeof addressSchema>;
 
 export const driverSchema = z.object({
   name: requiredString,
+  code: optionalString,
   phone: optionalString,
   defaultVehicleId: optionalString,
   active: checkbox,
@@ -110,8 +111,13 @@ export type DriverInput = z.infer<typeof driverSchema>;
 export const vehicleSchema = z.object({
   name: requiredString,
   plate: optionalString,
+  owner: optionalString,
   vehicleType,
   capacityPallets: optionalInt,
+  capacityVolumeM3: optionalFloat,
+  capacityWeightKg: optionalFloat,
+  dailyCost: optionalFloat,
+  costPerKm: optionalFloat,
   hasTailLift: checkbox,
   costLevel,
   active: checkbox,
@@ -124,6 +130,7 @@ export type VehicleInput = z.infer<typeof vehicleSchema>;
 // ---------------------------------------------------------------------------
 
 export const pickupSchema = z.object({
+  pickupNumber: optionalString,
   pickupDate: dateOnly,
   customerId: requiredString,
   addressId: requiredString,
@@ -134,8 +141,10 @@ export const pickupSchema = z.object({
   timeTo: optionalString,
   pallets: optionalInt,
   colli: optionalInt,
+  loadingMeters: optionalFloat,
   weightKg: optionalFloat,
   volumeM3: optionalFloat,
+  destination: optionalString,
   requiresTailLift: checkbox,
   requiresMotrice: checkbox,
   priority,
@@ -183,6 +192,9 @@ export const routeSchema = z.object({
   vehicleId: optionalString,
   shift: routeShift,
   status: routeStatus,
+  departureTime: optionalString,
+  returnTime: optionalString,
+  km: optionalFloat,
   notes: optionalString,
 });
 export type RouteInput = z.infer<typeof routeSchema>;

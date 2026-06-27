@@ -37,13 +37,24 @@ export default async function PresePage({
           <div className="font-medium text-slate-800">{p.customer.name}</div>
           <div className="text-xs text-slate-500">
             {p.address.city} ({p.address.province})
+            {p.destination ? <span className="text-slate-400"> · → {p.destination}</span> : null}
           </div>
         </div>
       ),
     },
     { header: "Origine", cell: (p) => <Badge tone={p.sourceType === "RECURRING" ? "blue" : "slate"}>{pickupSourceLabels[p.sourceType]}</Badge> },
     { header: "Fascia", cell: (p) => timeWindowLabels[p.timeWindow] },
-    { header: "Pallet", cell: (p) => p.pallets ?? "—" },
+    {
+      header: "Quantità",
+      cell: (p) =>
+        [
+          p.pallets != null ? `${p.pallets} plt` : null,
+          p.loadingMeters != null ? `${p.loadingMeters} mtl` : null,
+          p.volumeM3 != null ? `${p.volumeM3} m³` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ") || "—",
+    },
     { header: "Priorità", cell: (p) => priorityLabels[p.priority] },
     {
       header: "Stato",

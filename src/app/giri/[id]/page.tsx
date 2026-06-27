@@ -18,9 +18,12 @@ import {
 } from "@/features/routes/actions";
 import {
   routeTotalPallets,
+  routeTotalVolume,
+  routeTotalWeight,
   getRouteWarnings,
   hasMissingData,
 } from "@/lib/warnings";
+import { routeTotalCost, formatEuro } from "@/lib/costs";
 import { timeWindowLabels, priorityLabels } from "@/lib/labels";
 import { formatDateIt, toDateInputValue } from "@/lib/dates";
 
@@ -41,6 +44,9 @@ export default async function GiroDettaglioPage({
   ]);
 
   const totalPallets = routeTotalPallets(route);
+  const totalVolume = routeTotalVolume(route);
+  const totalWeight = routeTotalWeight(route);
+  const totalCost = routeTotalCost(route);
   const warnings = getRouteWarnings(route);
   const redirectTo = `/giri/${route.id}`;
 
@@ -71,6 +77,32 @@ export default async function GiroDettaglioPage({
           <RouteWarningBadges warnings={warnings} />
         </div>
       ) : null}
+
+      <div className="card mb-4 flex flex-wrap gap-x-8 gap-y-2 p-3 text-sm">
+        <div>
+          <span className="text-slate-500">Carico: </span>
+          <span className="font-medium text-slate-800">
+            {totalPallets} plt
+            {totalVolume > 0 ? ` · ${totalVolume.toFixed(1)} m³` : ""}
+            {totalWeight > 0 ? ` · ${totalWeight.toFixed(0)} kg` : ""}
+            {route.vehicle?.capacityPallets != null ? ` / ${route.vehicle.capacityPallets} plt` : ""}
+          </span>
+        </div>
+        <div>
+          <span className="text-slate-500">Orari: </span>
+          <span className="font-medium text-slate-800">
+            {route.departureTime ?? "—"} → {route.returnTime ?? "—"}
+          </span>
+        </div>
+        <div>
+          <span className="text-slate-500">Km: </span>
+          <span className="font-medium text-slate-800">{route.km ?? "—"}</span>
+        </div>
+        <div>
+          <span className="text-slate-500">Costo stimato: </span>
+          <span className="font-semibold text-slate-900">{formatEuro(totalCost)}</span>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Colonna sinistra: dati giro + fermate */}

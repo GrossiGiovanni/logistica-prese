@@ -59,6 +59,7 @@ type PickupLike = Pick<
   | "internalNotes"
   | "weightKg"
   | "volumeM3"
+  | "loadingMeters"
   | "colli"
   | "priority"
   | "requiresMotrice"
@@ -121,6 +122,21 @@ export function routeTotalPallets(route: RouteWithRelations): number {
   return route.stops.reduce((sum, stop) => sum + (stop.pickup.pallets ?? 0), 0);
 }
 
+/** Somma dei metri cubi delle prese del giro. */
+export function routeTotalVolume(route: RouteWithRelations): number {
+  return route.stops.reduce((sum, stop) => sum + (stop.pickup.volumeM3 ?? 0), 0);
+}
+
+/** Somma del peso (kg) delle prese del giro. */
+export function routeTotalWeight(route: RouteWithRelations): number {
+  return route.stops.reduce((sum, stop) => sum + (stop.pickup.weightKg ?? 0), 0);
+}
+
+/** Somma dei metri lineari (MTL) delle prese del giro. */
+export function routeTotalLoadingMeters(route: RouteWithRelations): number {
+  return route.stops.reduce((sum, stop) => sum + (stop.pickup.loadingMeters ?? 0), 0);
+}
+
 /** True se il giro usa una motrice (mezzo costoso). */
 export function routeUsesMotrice(route: RouteWithRelations): boolean {
   return route.vehicle?.vehicleType === "MOTRICE";
@@ -133,11 +149,14 @@ export function getRouteWarnings(route: RouteWithRelations): RouteWarning[] {
   if (!route.vehicle) warnings.push("vehicle_missing");
   if (!route.driver) warnings.push("driver_missing");
 
-  const totalPallets = routeTotalPallets(route);
-  if (
-    route.vehicle?.capacityPallets != null &&
-    totalPallets > route.vehicle.capacityPallets
-  ) {
+  const v = route.vehicle;
+  const overPallets =
+    v?.capacityPallets != null && routeTotalPallets(route) > v.capacityPallets;
+  const overVolume =
+    v?.capacityVolumeM3 != null && routeTotalVolume(route) > v.capacityVolumeM3;
+  const overWeight =
+    v?.capacityWeightKg != null && routeTotalWeight(route) > v.capacityWeightKg;
+  if (overPallets || overVolume || overWeight) {
     warnings.push("capacity_exceeded");
   }
 

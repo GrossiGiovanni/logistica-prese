@@ -26,8 +26,11 @@ export function VehicleForm({ vehicle }: { vehicle?: Vehicle }) {
         <Field label="Targa" htmlFor="plate" error={errors?.plate}>
           <input id="plate" name="plate" defaultValue={vehicle?.plate ?? ""} className="field-input" />
         </Field>
+        <Field label="Titolare" htmlFor="owner" error={errors?.owner} hint="Padroncino / proprietario del mezzo">
+          <input id="owner" name="owner" defaultValue={vehicle?.owner ?? ""} className="field-input" />
+        </Field>
         <Field label="Tipo *" htmlFor="vehicleType" error={errors?.vehicleType}>
-          <select id="vehicleType" name="vehicleType" defaultValue={vehicle?.vehicleType ?? "VAN"} className="field-input">
+          <select id="vehicleType" name="vehicleType" defaultValue={vehicle?.vehicleType ?? "BILICO"} className="field-input">
             {toOptions(vehicleTypeLabels).map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
@@ -42,6 +45,18 @@ export function VehicleForm({ vehicle }: { vehicle?: Vehicle }) {
         </Field>
         <Field label="Capacità pallet" htmlFor="capacityPallets" error={errors?.capacityPallets}>
           <input id="capacityPallets" name="capacityPallets" type="number" min={0} defaultValue={vehicle?.capacityPallets ?? ""} className="field-input" />
+        </Field>
+        <Field label="Capacità (m³)" htmlFor="capacityVolumeM3" error={errors?.capacityVolumeM3}>
+          <input id="capacityVolumeM3" name="capacityVolumeM3" type="number" min={0} step="0.1" defaultValue={vehicle?.capacityVolumeM3 ?? ""} className="field-input" />
+        </Field>
+        <Field label="Portata (kg)" htmlFor="capacityWeightKg" error={errors?.capacityWeightKg}>
+          <input id="capacityWeightKg" name="capacityWeightKg" type="number" min={0} step="1" defaultValue={vehicle?.capacityWeightKg ?? ""} className="field-input" />
+        </Field>
+        <Field label="Costo fisso / giorno (€)" htmlFor="dailyCost" error={errors?.dailyCost} hint="Giornata intera; metà per mezza giornata">
+          <input id="dailyCost" name="dailyCost" type="number" min={0} step="1" defaultValue={vehicle?.dailyCost ?? ""} className="field-input" />
+        </Field>
+        <Field label="Costo / km (€)" htmlFor="costPerKm" error={errors?.costPerKm}>
+          <input id="costPerKm" name="costPerKm" type="number" min={0} step="0.01" defaultValue={vehicle?.costPerKm ?? ""} className="field-input" />
         </Field>
         <Field label="Note" htmlFor="notes" error={errors?.notes}>
           <input id="notes" name="notes" defaultValue={vehicle?.notes ?? ""} className="field-input" />

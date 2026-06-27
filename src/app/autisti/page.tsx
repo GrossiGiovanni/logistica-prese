@@ -23,6 +23,7 @@ export default async function AutistiPage() {
         </div>
       ),
     },
+    { header: "Codice", cell: (d) => d.code ?? "—" },
     { header: "Telefono", cell: (d) => d.phone ?? "—" },
     { header: "Mezzo predefinito", cell: (d) => d.defaultVehicle?.name ?? "—" },
     {

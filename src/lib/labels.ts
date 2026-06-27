@@ -15,6 +15,7 @@ import type {
 export const vehicleTypeLabels: Record<VehicleType, string> = {
   VAN: "Furgone",
   TRUCK: "Camion",
+  BILICO: "Bilico",
   MOTRICE: "Motrice",
 };
 

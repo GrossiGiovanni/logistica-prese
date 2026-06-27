@@ -28,6 +28,9 @@ export function DriverForm({
         <Field label="Nome *" htmlFor="name" error={errors?.name}>
           <input id="name" name="name" defaultValue={driver?.name ?? ""} required className="field-input" />
         </Field>
+        <Field label="Codice" htmlFor="code" error={errors?.code} hint="Codice autista (es. 13130)">
+          <input id="code" name="code" defaultValue={driver?.code ?? ""} className="field-input" />
+        </Field>
         <Field label="Telefono" htmlFor="phone" error={errors?.phone}>
           <input id="phone" name="phone" defaultValue={driver?.phone ?? ""} className="field-input" />
         </Field>

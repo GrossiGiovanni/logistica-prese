@@ -5,7 +5,8 @@ import { Badge } from "@/components/badges/Badge";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { listVehicles } from "@/features/vehicles/queries";
 import { deleteVehicle } from "@/features/vehicles/actions";
-import { vehicleTypeLabels, costLevelLabels } from "@/lib/labels";
+import { vehicleTypeLabels } from "@/lib/labels";
+import { formatEuro } from "@/lib/costs";
 
 type Row = Awaited<ReturnType<typeof listVehicles>>[number];
 
@@ -26,6 +27,7 @@ export default async function MezziPage() {
       ),
     },
     { header: "Targa", cell: (v) => v.plate ?? "—" },
+    { header: "Titolare", cell: (v) => v.owner ?? "—" },
     {
       header: "Tipo",
       cell: (v) => (
@@ -34,16 +36,18 @@ export default async function MezziPage() {
         </Badge>
       ),
     },
-    { header: "Capacità", cell: (v) => (v.capacityPallets != null ? `${v.capacityPallets} pallet` : "—") },
-    { header: "Sponda", cell: (v) => (v.hasTailLift ? "Sì" : "No") },
     {
-      header: "Costo",
-      cell: (v) => (
-        <Badge tone={v.costLevel === "HIGH" ? "red" : v.costLevel === "MEDIUM" ? "amber" : "green"}>
-          {costLevelLabels[v.costLevel]}
-        </Badge>
-      ),
+      header: "Capacità",
+      cell: (v) =>
+        [
+          v.capacityPallets != null ? `${v.capacityPallets} plt` : null,
+          v.capacityVolumeM3 != null ? `${v.capacityVolumeM3} m³` : null,
+          v.capacityWeightKg != null ? `${v.capacityWeightKg} kg` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ") || "—",
     },
+    { header: "Costo/gg", cell: (v) => formatEuro(v.dailyCost) },
     {
       header: "",
       className: "text-right",

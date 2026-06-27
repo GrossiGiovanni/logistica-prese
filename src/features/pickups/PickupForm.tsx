@@ -41,6 +41,9 @@ export function PickupForm({
       {pickup ? <input type="hidden" name="id" value={pickup.id} /> : null}
 
       <FormSection title="Presa" description="I campi con * sono obbligatori. Pallet/peso/volume non bloccano il salvataggio ma la presa sarà segnalata.">
+        <Field label="N. presa" htmlFor="pickupNumber" error={errors?.pickupNumber} hint="Numero presa AS400">
+          <input id="pickupNumber" name="pickupNumber" defaultValue={pickup?.pickupNumber ?? ""} className="field-input" />
+        </Field>
         <Field label="Data *" htmlFor="pickupDate" error={errors?.pickupDate}>
           <input
             id="pickupDate"
@@ -128,6 +131,9 @@ export function PickupForm({
         <Field label="Colli" htmlFor="colli" error={errors?.colli}>
           <input id="colli" name="colli" type="number" min={0} defaultValue={pickup?.colli ?? ""} className="field-input" />
         </Field>
+        <Field label="Metri lineari (MTL)" htmlFor="loadingMeters" error={errors?.loadingMeters}>
+          <input id="loadingMeters" name="loadingMeters" type="number" min={0} step="0.1" defaultValue={pickup?.loadingMeters ?? ""} className="field-input" />
+        </Field>
         <Field label="Peso (kg)" htmlFor="weightKg" error={errors?.weightKg}>
           <input id="weightKg" name="weightKg" type="number" min={0} step="0.1" defaultValue={pickup?.weightKg ?? ""} className="field-input" />
         </Field>
@@ -143,6 +149,9 @@ export function PickupForm({
       </FormSection>
 
       <FormSection title="Note">
+        <Field label="Destinazione finale" htmlFor="destination" error={errors?.destination} hint="Es. MD MACOMER, CATANIA" full>
+          <input id="destination" name="destination" defaultValue={pickup?.destination ?? ""} className="field-input" />
+        </Field>
         <Field label="Note operative (dal cliente)" htmlFor="rawNotes" error={errors?.rawNotes} full>
           <textarea id="rawNotes" name="rawNotes" defaultValue={pickup?.rawNotes ?? ""} rows={2} className="field-input" />
         </Field>

@@ -19,6 +19,14 @@ next-env.d.ts
 # prisma
 /prisma/*.db
 
+# dati reali del cliente (riservati, non versionare)
+/prisma/seed-data/bundle.json
+*.xlsx
+
+# dati reali del cliente (riservati, non versionare)
+/prisma/seed-data/bundle.json
+*.xlsx
+
 # misc
 .DS_Store
 *.pem

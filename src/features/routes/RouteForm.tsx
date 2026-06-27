@@ -76,6 +76,15 @@ export function RouteForm({
         ) : (
           <input type="hidden" name="status" value="DRAFT" />
         )}
+        <Field label="Ora partenza" htmlFor="departureTime" error={errors?.departureTime}>
+          <input id="departureTime" name="departureTime" type="time" defaultValue={route?.departureTime ?? ""} className="field-input" />
+        </Field>
+        <Field label="Ora rientro" htmlFor="returnTime" error={errors?.returnTime}>
+          <input id="returnTime" name="returnTime" type="time" defaultValue={route?.returnTime ?? ""} className="field-input" />
+        </Field>
+        <Field label="Km percorsi" htmlFor="km" error={errors?.km}>
+          <input id="km" name="km" type="number" min={0} step="0.1" defaultValue={route?.km ?? ""} className="field-input" />
+        </Field>
         <Field label="Note" htmlFor="notes" error={errors?.notes} full>
           <textarea id="notes" name="notes" defaultValue={route?.notes ?? ""} rows={2} className="field-input" />
         </Field>

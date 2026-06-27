@@ -43,6 +43,50 @@ export function getPickup(id: string) {
   return prisma.pickup.findUnique({ where: { id } });
 }
 
+export type PickupMapPoint = {
+  id: string;
+  customerName: string;
+  city: string;
+  province: string;
+  timeWindow: TimeWindow;
+  pallets: number | null;
+  assigned: boolean;
+  lat: number;
+  lng: number;
+};
+
+/** Prese del giorno con coordinate, per la mappa. Esclude annullate e prive di geocodifica. */
+export async function listPickupsForMap(date: string): Promise<PickupMapPoint[]> {
+  const rows = await prisma.pickup.findMany({
+    where: {
+      pickupDate: parseDateOnly(date),
+      status: { not: "CANCELLED" },
+      address: { lat: { not: null }, lng: { not: null } },
+    },
+    select: {
+      id: true,
+      timeWindow: true,
+      pallets: true,
+      customer: { select: { name: true } },
+      address: { select: { city: true, province: true, lat: true, lng: true } },
+      routeStops: { select: { routeId: true } },
+    },
+    orderBy: [{ priority: "desc" }, { timeWindow: "asc" }],
+  });
+
+  return rows.map((p) => ({
+    id: p.id,
+    customerName: p.customer.name,
+    city: p.address.city,
+    province: p.address.province,
+    timeWindow: p.timeWindow,
+    pallets: p.pallets,
+    assigned: p.routeStops.length > 0,
+    lat: p.address.lat!,
+    lng: p.address.lng!,
+  }));
+}
+
 /** Prese assegnabili a un giro per una certa data: READY o DRAFT, non annullate, non già pianificate altrove. */
 export function listUnassignedPickups(date: string) {
   return prisma.pickup.findMany({

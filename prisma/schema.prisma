@@ -17,6 +17,7 @@ datasource db {
 enum VehicleType {
   VAN
   TRUCK
+  BILICO
   MOTRICE
 }
 
@@ -92,6 +93,8 @@ model Address {
   province   String
   postalCode String?
   country    String   @default("IT")
+  lat        Float?
+  lng        Float?
   notes      String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -107,6 +110,7 @@ model Address {
 model Driver {
   id               String   @id @default(cuid())
   name             String
+  code             String?
   phone            String?
   defaultVehicleId String?
   active           Boolean  @default(true)
@@ -121,17 +125,22 @@ model Driver {
 }
 
 model Vehicle {
-  id              String      @id @default(cuid())
-  name            String
-  plate           String?
-  vehicleType     VehicleType @default(VAN)
-  capacityPallets Int?
-  hasTailLift     Boolean     @default(false)
-  costLevel       CostLevel   @default(MEDIUM)
-  active          Boolean     @default(true)
-  notes           String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id               String      @id @default(cuid())
+  name             String
+  plate            String?
+  owner            String? // Titolare / padroncino (es. RA.MA., OMAR, EUROSARDA)
+  vehicleType      VehicleType @default(BILICO)
+  capacityPallets  Int?
+  capacityVolumeM3 Float? // Capienza in metri cubi
+  capacityWeightKg Float? // Portata in kg
+  dailyCost        Float? // Costo fisso giornaliero (giornata intera)
+  costPerKm        Float? // Tariffa al km
+  hasTailLift      Boolean     @default(false)
+  costLevel        CostLevel   @default(MEDIUM)
+  active           Boolean     @default(true)
+  notes            String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 
   routes        Route[]
   defaultForDrivers Driver[] @relation("DriverDefaultVehicle")
@@ -142,6 +151,7 @@ model Vehicle {
 
 model Pickup {
   id                String           @id @default(cuid())
+  pickupNumber      String? // Numero presa AS400 (es. "2026 13 9004641")
   pickupDate        DateTime         @db.Date
   customerId        String
   addressId         String
@@ -152,8 +162,10 @@ model Pickup {
   timeTo            String?
   pallets           Int?
   colli             Int?
+  loadingMeters     Float? // Metri lineari di carico (MTL)
   weightKg          Float?
   volumeM3          Float?
+  destination       String? // Destinazione finale (es. "MD MACOMER", "CATANIA")
   requiresTailLift  Boolean          @default(false)
   requiresMotrice   Boolean          @default(false)
   priority          Priority         @default(NORMAL)
@@ -174,6 +186,7 @@ model Pickup {
   @@index([status])
   @@index([sourceType])
   @@index([customerId])
+  @@index([pickupNumber])
 }
 
 model RecurringPickup {
@@ -211,15 +224,18 @@ model RecurringPickup {
 }
 
 model Route {
-  id        String      @id @default(cuid())
-  routeDate DateTime    @db.Date
-  driverId  String?
-  vehicleId String?
-  shift     RouteShift  @default(FULL_DAY)
-  status    RouteStatus @default(DRAFT)
-  notes     String?
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id            String      @id @default(cuid())
+  routeDate     DateTime    @db.Date
+  driverId      String?
+  vehicleId     String?
+  shift         RouteShift  @default(FULL_DAY)
+  status        RouteStatus @default(DRAFT)
+  departureTime String? // Ora partenza (HH:MM)
+  returnTime    String? // Ora rientro (HH:MM)
+  km            Float? // Km percorsi (inserimento manuale)
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   driver  Driver?     @relation(fields: [driverId], references: [id], onDelete: SetNull)
   vehicle Vehicle?    @relation(fields: [vehicleId], references: [id], onDelete: SetNull)

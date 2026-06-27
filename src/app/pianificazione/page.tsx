@@ -16,6 +16,7 @@ import {
   getRouteWarnings,
   hasMissingData,
 } from "@/lib/warnings";
+import { routeTotalCost, formatEuro } from "@/lib/costs";
 import { routeShiftLabels, timeWindowLabels, priorityLabels } from "@/lib/labels";
 import { formatDateIt, tomorrowInputValue, parseDateOnly } from "@/lib/dates";
 
@@ -148,6 +149,7 @@ export default async function PianificazionePage({
                             {total}
                             {r.vehicle?.capacityPallets != null ? ` / ${r.vehicle.capacityPallets}` : ""} pallet
                           </span>
+                          {routeTotalCost(r) != null ? ` · ${formatEuro(routeTotalCost(r))}` : ""}
                         </div>
                       </div>
                       <Link href={`/giri/${r.id}`} className="btn-secondary shrink-0">Apri giro</Link>

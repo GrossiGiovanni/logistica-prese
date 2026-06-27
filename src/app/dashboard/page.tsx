@@ -8,6 +8,7 @@ import { DateSelector } from "@/components/ui/DateSelector";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getDailyStats } from "@/features/dashboard/queries";
 import { hasMissingData, routeTotalPallets, routeUsesMotrice } from "@/lib/warnings";
+import { routeTotalCost, formatEuro } from "@/lib/costs";
 import { routeShiftLabels, timeWindowLabels } from "@/lib/labels";
 import { formatDateIt, tomorrowInputValue, parseDateOnly } from "@/lib/dates";
 
@@ -19,6 +20,8 @@ export default async function DashboardPage({
   const { date } = await searchParams;
   const selectedDate = date ?? tomorrowInputValue();
   const { pickups, routes, kpi } = await getDailyStats(selectedDate);
+
+  const dailyCost = routes.reduce((sum, r) => sum + (routeTotalCost(r) ?? 0), 0);
 
   return (
     <div>
@@ -41,6 +44,7 @@ export default async function DashboardPage({
         <KpiCard label="Giri creati" value={kpi.routesCount} />
         <KpiCard label="Mezzi usati" value={kpi.vehiclesUsed} />
         <KpiCard label="Motrici usate" value={kpi.motriciUsed} tone={kpi.motriciUsed > 0 ? "red" : "default"} hint="Costo alto" />
+        <KpiCard label="Costo giornata" value={dailyCost > 0 ? formatEuro(dailyCost) : "—"} hint="Stima giri del giorno" />
       </KpiGrid>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -96,6 +100,7 @@ export default async function DashboardPage({
                     </div>
                     <div className="text-xs text-slate-500">
                       {routeShiftLabels[r.shift]} · {r.driver?.name ?? "—"} · {r.stops.length} prese · {routeTotalPallets(r)} pallet
+                      {routeTotalCost(r) != null ? ` · ${formatEuro(routeTotalCost(r))}` : ""}
                     </div>
                   </div>
                   <RouteStatusBadge status={r.status} />
