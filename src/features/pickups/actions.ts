@@ -29,6 +29,21 @@ export async function upsertPickup(
   redirect("/prese");
 }
 
+/** Imposta rapidamente la fascia operativa di una presa (dalla pianificazione). */
+export async function setPickupTimeWindow(formData: FormData): Promise<void> {
+  const pickupId = formData.get("pickupId") as string;
+  const timeWindow = formData.get("timeWindow") as "MORNING" | "AFTERNOON" | "ANYTIME";
+  const redirectTo = (formData.get("redirectTo") as string) || "/pianificazione";
+  if (!pickupId || !timeWindow) return;
+
+  await prisma.pickup.update({ where: { id: pickupId }, data: { timeWindow } });
+
+  revalidatePath("/pianificazione");
+  revalidatePath("/prese");
+  revalidatePath("/dashboard");
+  redirect(redirectTo);
+}
+
 /** Annulla logicamente una presa (status = CANCELLED). */
 export async function cancelPickup(formData: FormData): Promise<void> {
   const id = formData.get("id") as string;

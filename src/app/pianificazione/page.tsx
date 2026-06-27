@@ -20,9 +20,10 @@ import {
   hasMissingData,
 } from "@/lib/warnings";
 import { routeTotalCost, formatEuro } from "@/lib/costs";
-import { routeShiftLabels, timeWindowLabels, priorityLabels, routeLabel } from "@/lib/labels";
+import { routeShiftLabels, priorityLabels, routeLabel } from "@/lib/labels";
 import { formatDateIt, tomorrowInputValue, parseDateOnly } from "@/lib/dates";
 import { UnassignedFilters } from "@/features/pickups/UnassignedFilters";
+import { PickupShiftSelect } from "@/features/pickups/PickupShiftSelect";
 import { getPianFilters, getOpDate } from "@/lib/persisted-filters";
 import type { TimeWindow, Priority } from "@prisma/client";
 
@@ -116,7 +117,12 @@ export default async function PianificazionePage({
                     {hasMissingData(p) ? <MissingDataBadge /> : null}
                   </div>
                   <div className="mt-1 text-xs text-slate-500">
-                    {p.address.city} ({p.address.province}) · {timeWindowLabels[p.timeWindow]} · {p.pallets ?? "—"} pallet
+                    {p.address.city} ({p.address.province}) · {p.pallets ?? "—"} pallet
+                  </div>
+
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-xs text-slate-500">Fascia:</span>
+                    <PickupShiftSelect pickupId={p.id} value={p.timeWindow} redirectTo={redirectTo} />
                   </div>
 
                   {routes.length === 0 ? (
@@ -131,7 +137,7 @@ export default async function PianificazionePage({
                         <option value="" disabled>Assegna al giro…</option>
                         {routes.map((r) => (
                           <option key={r.id} value={r.id}>
-                            {(r.vehicle?.name ?? "Mezzo da assegnare") + " · " + routeShiftLabels[r.shift]}
+                            {routeLabel(r) + " · " + routeShiftLabels[r.shift]}
                           </option>
                         ))}
                       </select>
