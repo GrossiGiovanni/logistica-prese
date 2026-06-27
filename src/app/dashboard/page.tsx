@@ -11,7 +11,7 @@ import { ensureRecurringForDate } from "@/features/recurring-pickups/generate";
 import { getOpDate } from "@/lib/persisted-filters";
 import { hasMissingData, routeTotalPallets, routeUsesMotrice } from "@/lib/warnings";
 import { routeTotalCost, formatEuro } from "@/lib/costs";
-import { routeShiftLabels, timeWindowLabels } from "@/lib/labels";
+import { routeShiftLabels, timeWindowLabels, routeLabel } from "@/lib/labels";
 import { formatDateIt, tomorrowInputValue, parseDateOnly } from "@/lib/dates";
 
 export default async function DashboardPage({
@@ -99,7 +99,7 @@ export default async function DashboardPage({
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <Link href={`/giri/${r.id}`} className="font-medium text-slate-800 hover:underline">
-                        {r.vehicle?.name ?? "Mezzo da assegnare"}
+                        {routeLabel(r)}
                       </Link>
                       {routeUsesMotrice(r) ? <Badge tone="purple">Motrice</Badge> : null}
                     </div>

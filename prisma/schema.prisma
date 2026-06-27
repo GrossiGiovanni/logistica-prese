@@ -133,6 +133,7 @@ model Vehicle {
   capacityPallets  Int?
   capacityVolumeM3 Float? // Capienza in metri cubi
   capacityWeightKg Float? // Portata in kg
+  availability     RouteShift  @default(FULL_DAY) // Fascia di disponibilità del mezzo
   dailyCost        Float? // Costo fisso giornaliero (giornata intera)
   costPerKm        Float? // Tariffa al km
   hasTailLift      Boolean     @default(false)

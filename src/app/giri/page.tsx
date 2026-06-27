@@ -9,7 +9,7 @@ import { listRoutes } from "@/features/routes/queries";
 import { ensureDailyRoutes } from "@/features/routes/ensure-daily";
 import { getOpDate } from "@/lib/persisted-filters";
 import { routeTotalPallets, routeUsesMotrice, getRouteWarnings } from "@/lib/warnings";
-import { routeShiftLabels } from "@/lib/labels";
+import { routeShiftLabels, routeLabel } from "@/lib/labels";
 import { formatDateIt, tomorrowInputValue, parseDateOnly } from "@/lib/dates";
 
 export default async function GiriPage({
@@ -55,14 +55,13 @@ export default async function GiriPage({
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-slate-900">
-                        {route.vehicle?.name ?? "Mezzo da assegnare"}
+                        {routeLabel(route)}
                       </span>
                       {routeUsesMotrice(route) ? <Badge tone="purple">Motrice</Badge> : null}
                       <RouteStatusBadge status={route.status} />
                     </div>
                     <div className="mt-1 text-sm text-slate-500">
                       {routeShiftLabels[route.shift]} ·{" "}
-                      {route.driver?.name ?? "Autista da assegnare"} ·{" "}
                       {route.stops.length} prese · {totalPallets} pallet
                       {route.vehicle?.capacityPallets != null
                         ? ` / ${route.vehicle.capacityPallets}`

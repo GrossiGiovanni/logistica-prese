@@ -5,7 +5,7 @@ import { Badge } from "@/components/badges/Badge";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { listVehicles } from "@/features/vehicles/queries";
 import { deleteVehicle } from "@/features/vehicles/actions";
-import { vehicleTypeLabels } from "@/lib/labels";
+import { vehicleTypeLabels, routeShiftLabels } from "@/lib/labels";
 import { formatEuro } from "@/lib/costs";
 
 type Row = Awaited<ReturnType<typeof listVehicles>>[number];
@@ -46,6 +46,14 @@ export default async function MezziPage() {
         ]
           .filter(Boolean)
           .join(" · ") || "—",
+    },
+    {
+      header: "Disponibilità",
+      cell: (v) => (
+        <Badge tone={v.availability === "FULL_DAY" ? "slate" : "amber"}>
+          {routeShiftLabels[v.availability]}
+        </Badge>
+      ),
     },
     { header: "Costo/gg", cell: (v) => formatEuro(v.dailyCost) },
     {

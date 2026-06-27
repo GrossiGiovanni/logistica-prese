@@ -4,15 +4,21 @@
 // le prese. Idempotente: crea solo i giri mancanti, solo per oggi/futuro.
 
 import { prisma } from "@/lib/db";
-import { parseDateOnly, weekdayKey, todayInputValue } from "@/lib/dates";
+import { parseDateOnly, weekdayKey, yesterdayInputValue } from "@/lib/dates";
 
 const WORKDAYS = new Set(["monday", "tuesday", "wednesday", "thursday", "friday"]);
 
 export async function ensureDailyRoutes(dateStr: string): Promise<void> {
-  if (dateStr < todayInputValue()) return; // non backfilla lo storico
+  // Finestra operativa: dal giorno prima in poi (non backfilla lo storico più vecchio).
+  if (dateStr < yesterdayInputValue()) return;
   if (!WORKDAYS.has(weekdayKey(parseDateOnly(dateStr)))) return; // solo giorni lavorativi
 
   const date = parseDateOnly(dateStr);
+
+  // Seed una volta sola per giornata: se esistono già giri per quella data non
+  // ricreo nulla (così un giro eliminato dall'operatore non ricompare).
+  const already = await prisma.route.count({ where: { routeDate: date } });
+  if (already > 0) return;
 
   // Autisti attivi con un mezzo predefinito assegnato.
   const drivers = await prisma.driver.findMany({
@@ -21,17 +27,8 @@ export async function ensureDailyRoutes(dateStr: string): Promise<void> {
   });
   if (drivers.length === 0) return;
 
-  const existing = await prisma.route.findMany({
-    where: { routeDate: date, driverId: { in: drivers.map((d) => d.id) } },
-    select: { driverId: true },
-  });
-  const existingDriverIds = new Set(existing.map((e) => e.driverId));
-
-  const toCreate = drivers.filter((d) => !existingDriverIds.has(d.id));
-  if (toCreate.length === 0) return;
-
   await prisma.route.createMany({
-    data: toCreate.map((d) => ({
+    data: drivers.map((d) => ({
       routeDate: date,
       driverId: d.id,
       vehicleId: d.defaultVehicleId,

@@ -8,7 +8,7 @@ import { DateSelector } from "@/components/ui/DateSelector";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { getDailyStats } from "@/features/dashboard/queries";
 import { listUnassignedPickups } from "@/features/pickups/queries";
-import { assignPickupToRoute } from "@/features/routes/actions";
+import { assignPickupToRoute, deleteRoute } from "@/features/routes/actions";
 import { GenerateRecurringForm } from "@/features/recurring-pickups/GenerateRecurringForm";
 import { ensureRecurringForDate } from "@/features/recurring-pickups/generate";
 import { ensureDailyRoutes } from "@/features/routes/ensure-daily";
@@ -16,10 +16,11 @@ import {
   routeTotalPallets,
   routeUsesMotrice,
   getRouteWarnings,
+  findResourceOverlaps,
   hasMissingData,
 } from "@/lib/warnings";
 import { routeTotalCost, formatEuro } from "@/lib/costs";
-import { routeShiftLabels, timeWindowLabels, priorityLabels } from "@/lib/labels";
+import { routeShiftLabels, timeWindowLabels, priorityLabels, routeLabel } from "@/lib/labels";
 import { formatDateIt, tomorrowInputValue, parseDateOnly } from "@/lib/dates";
 import { UnassignedFilters } from "@/features/pickups/UnassignedFilters";
 import { getPianFilters, getOpDate } from "@/lib/persisted-filters";
@@ -51,6 +52,9 @@ export default async function PianificazionePage({
       priority: (prio as Priority) || undefined,
     }),
   ]);
+
+  // Conflitti di risorsa (stesso mezzo/autista su fasce sovrapposte) tra i giri del giorno.
+  const overlapIds = findResourceOverlaps(routes);
 
   return (
     <div>
@@ -153,6 +157,7 @@ export default async function PianificazionePage({
             <ul className="space-y-2">
               {routes.map((r) => {
                 const warnings = getRouteWarnings(r);
+                if (overlapIds.has(r.id)) warnings.push("resource_overlap");
                 const total = routeTotalPallets(r);
                 const capExceeded =
                   r.vehicle?.capacityPallets != null && total > r.vehicle.capacityPallets;
@@ -162,13 +167,13 @@ export default async function PianificazionePage({
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
                           <Link href={`/giri/${r.id}`} className="font-semibold text-slate-900 hover:underline">
-                            {r.vehicle?.name ?? "Mezzo da assegnare"}
+                            {routeLabel(r)}
                           </Link>
                           {routeUsesMotrice(r) ? <Badge tone="purple">Motrice</Badge> : null}
                           <RouteStatusBadge status={r.status} />
                         </div>
                         <div className="mt-1 text-xs text-slate-500">
-                          {routeShiftLabels[r.shift]} · {r.driver?.name ?? "Autista da assegnare"} · {r.stops.length} prese ·{" "}
+                          {routeShiftLabels[r.shift]} · {r.stops.length} prese ·{" "}
                           <span className={capExceeded ? "font-semibold text-red-600" : ""}>
                             {total}
                             {r.vehicle?.capacityPallets != null ? ` / ${r.vehicle.capacityPallets}` : ""} pallet
@@ -177,7 +182,20 @@ export default async function PianificazionePage({
                           {routeTotalCost(r) != null ? ` · ${formatEuro(routeTotalCost(r))}` : ""}
                         </div>
                       </div>
-                      <Link href={`/giri/${r.id}`} className="btn-secondary shrink-0">Apri giro</Link>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Link href={`/giri/${r.id}`} className="btn-secondary">Apri giro</Link>
+                        <form action={deleteRoute}>
+                          <input type="hidden" name="id" value={r.id} />
+                          <input type="hidden" name="redirectTo" value={redirectTo} />
+                          <ConfirmButton
+                            variant="danger"
+                            className="px-2 py-1"
+                            confirm={`Eliminare il giro "${routeLabel(r)}"? Le prese torneranno disponibili.`}
+                          >
+                            ✕
+                          </ConfirmButton>
+                        </form>
+                      </div>
                     </div>
                     {warnings.length > 0 ? (
                       <div className="mt-2">

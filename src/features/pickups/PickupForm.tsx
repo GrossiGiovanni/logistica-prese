@@ -8,8 +8,8 @@ import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import {
   pickupSourceLabels,
   pickupStatusLabels,
-  timeWindowLabels,
   priorityLabels,
+  pickupShiftOptions,
   toOptions,
 } from "@/lib/labels";
 import { toDateInputValue } from "@/lib/dates";
@@ -110,9 +110,18 @@ export function PickupForm({
       </FormSection>
 
       <FormSection title="Fascia oraria e quantità">
-        <Field label="Fascia oraria" htmlFor="timeWindow" error={errors?.timeWindow}>
-          <select id="timeWindow" name="timeWindow" defaultValue={pickup?.timeWindow ?? "ANYTIME"} className="field-input">
-            {toOptions(timeWindowLabels).map((o) => (
+        <Field label="Fascia operativa" htmlFor="timeWindow" error={errors?.timeWindow}>
+          <select
+            id="timeWindow"
+            name="timeWindow"
+            defaultValue={
+              pickup?.timeWindow === "MORNING" || pickup?.timeWindow === "AFTERNOON"
+                ? pickup.timeWindow
+                : "ANYTIME"
+            }
+            className="field-input"
+          >
+            {pickupShiftOptions.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>

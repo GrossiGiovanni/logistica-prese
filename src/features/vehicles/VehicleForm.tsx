@@ -5,7 +5,7 @@ import type { Vehicle } from "@prisma/client";
 import { upsertVehicle } from "./actions";
 import { FormSection, Field, CheckboxField } from "@/components/forms/FormSection";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
-import { vehicleTypeLabels, costLevelLabels, toOptions } from "@/lib/labels";
+import { vehicleTypeLabels, costLevelLabels, routeShiftLabels, toOptions } from "@/lib/labels";
 import type { ActionResult } from "@/lib/validations";
 
 export function VehicleForm({ vehicle }: { vehicle?: Vehicle }) {
@@ -39,6 +39,13 @@ export function VehicleForm({ vehicle }: { vehicle?: Vehicle }) {
         <Field label="Livello costo *" htmlFor="costLevel" error={errors?.costLevel} hint="Le motrici hanno costo alto.">
           <select id="costLevel" name="costLevel" defaultValue={vehicle?.costLevel ?? "MEDIUM"} className="field-input">
             {toOptions(costLevelLabels).map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Disponibilità *" htmlFor="availability" error={errors?.availability} hint="Fascia in cui il mezzo può lavorare.">
+          <select id="availability" name="availability" defaultValue={vehicle?.availability ?? "FULL_DAY"} className="field-input">
+            {toOptions(routeShiftLabels).map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>

@@ -116,6 +116,7 @@ export const vehicleSchema = z.object({
   capacityPallets: optionalInt,
   capacityVolumeM3: optionalFloat,
   capacityWeightKg: optionalFloat,
+  availability: routeShift,
   dailyCost: optionalFloat,
   costPerKm: optionalFloat,
   hasTailLift: checkbox,

@@ -47,9 +47,18 @@ export function RouteForm({
     if (d) setDriverId(d); // propone l'autista associato al mezzo
   }
 
+  // Nome giro generato automaticamente: "Autista / Mezzo".
+  const driverName = drivers.find((d) => d.id === driverId)?.name ?? "Autista da assegnare";
+  const vehicleName = vehicles.find((v) => v.id === vehicleId)?.name ?? "Mezzo da assegnare";
+
   return (
     <form action={formAction} className="space-y-4">
       {route ? <input type="hidden" name="id" value={route.id} /> : null}
+
+      <div className="rounded-lg border border-brand-200 bg-brand-50 px-4 py-2 text-sm">
+        <span className="text-slate-500">Nome giro: </span>
+        <span className="font-semibold text-slate-900">{driverName} / {vehicleName}</span>
+      </div>
 
       <FormSection title="Dati giro">
         <Field label="Data *" htmlFor="routeDate" error={errors?.routeDate}>

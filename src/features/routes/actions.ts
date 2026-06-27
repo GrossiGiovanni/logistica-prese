@@ -121,6 +121,7 @@ export async function setRouteStatus(formData: FormData): Promise<void> {
 /** Elimina un giro: le prese assegnate tornano disponibili. */
 export async function deleteRoute(formData: FormData): Promise<void> {
   const id = formData.get("id") as string;
+  const redirectTo = (formData.get("redirectTo") as string) || "/giri";
   if (!id) return;
 
   const stops = await prisma.routeStop.findMany({
@@ -141,7 +142,7 @@ export async function deleteRoute(formData: FormData): Promise<void> {
   ]);
 
   revalidateRoutes();
-  redirect("/giri");
+  redirect(redirectTo);
 }
 
 /** Assegna una presa a un giro (in coda) e la porta in stato PLANNED. */

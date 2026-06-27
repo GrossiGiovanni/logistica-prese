@@ -1,7 +1,7 @@
 // Logica centralizzata per il calcolo dei warning su prese e giri.
 // Usata sia lato server (generazione, KPI) sia lato UI (badge).
 
-import type { Pickup, Vehicle, Driver, RouteStop, Route } from "@prisma/client";
+import type { Pickup, Vehicle, Driver, RouteStop, Route, RouteShift, TimeWindow } from "@prisma/client";
 
 export type PickupWarning =
   | "missing_pallets"
@@ -15,7 +15,32 @@ export type RouteWarning =
   | "driver_missing"
   | "capacity_exceeded"
   | "expensive_vehicle_used"
-  | "contains_unvalidated_pickups";
+  | "contains_unvalidated_pickups"
+  | "pickup_shift_mismatch"
+  | "vehicle_unavailable"
+  | "resource_overlap";
+
+// ---------------------------------------------------------------------------
+// Compatibilità fasce (mattina / pomeriggio / giornata intera)
+// ---------------------------------------------------------------------------
+
+/** True se il mezzo (sua disponibilità) può coprire la fascia del giro. */
+export function vehicleCovers(availability: RouteShift, shift: RouteShift): boolean {
+  return availability === "FULL_DAY" || availability === shift;
+}
+
+/** True se la fascia della presa è compatibile con la fascia del giro. */
+export function pickupFitsShift(timeWindow: TimeWindow, shift: RouteShift): boolean {
+  if (shift === "FULL_DAY") return true; // un giro a giornata intera accetta tutto
+  if (timeWindow === "MORNING") return shift === "MORNING";
+  if (timeWindow === "AFTERNOON") return shift === "AFTERNOON";
+  return true; // ANYTIME / SPECIFIC: indifferente
+}
+
+/** True se due fasce si sovrappongono (mattina e pomeriggio NON si sovrappongono). */
+export function shiftsOverlap(a: RouteShift, b: RouteShift): boolean {
+  return a === "FULL_DAY" || b === "FULL_DAY" || a === b;
+}
 
 export const pickupWarningLabels: Record<PickupWarning, string> = {
   missing_pallets: "Pallet mancanti",
@@ -31,6 +56,9 @@ export const routeWarningLabels: Record<RouteWarning, string> = {
   capacity_exceeded: "Capacità superata",
   expensive_vehicle_used: "Mezzo costoso (motrice)",
   contains_unvalidated_pickups: "Prese con dati mancanti",
+  pickup_shift_mismatch: "Presa in fascia diversa dal giro",
+  vehicle_unavailable: "Mezzo non disponibile in questa fascia",
+  resource_overlap: "Mezzo/autista già impegnato",
 };
 
 // Tono del badge: rosso per criticità bloccanti, giallo per avvisi.
@@ -48,6 +76,9 @@ export const routeWarningTone: Record<RouteWarning, "red" | "amber" | "blue"> = 
   capacity_exceeded: "red",
   expensive_vehicle_used: "blue",
   contains_unvalidated_pickups: "amber",
+  pickup_shift_mismatch: "red",
+  vehicle_unavailable: "red",
+  resource_overlap: "red",
 };
 
 type PickupLike = Pick<
@@ -167,8 +198,42 @@ export function getRouteWarnings(route: RouteWithRelations): RouteWarning[] {
     warnings.push("expensive_vehicle_used");
   }
 
+  // Mezzo non disponibile nella fascia del giro.
+  if (route.vehicle && !vehicleCovers(route.vehicle.availability, route.shift)) {
+    warnings.push("vehicle_unavailable");
+  }
+
+  // Almeno una presa in una fascia incompatibile col giro.
+  const shiftMismatch = route.stops.some(
+    (stop) => !pickupFitsShift(stop.pickup.timeWindow, route.shift),
+  );
+  if (shiftMismatch) warnings.push("pickup_shift_mismatch");
+
   const hasUnvalidated = route.stops.some((stop) => hasMissingData(stop.pickup));
   if (hasUnvalidated) warnings.push("contains_unvalidated_pickups");
 
   return warnings;
+}
+
+/**
+ * Conflitti di risorse tra i giri di una giornata: stesso mezzo o stesso autista
+ * usato in due giri con fasce sovrapposte. Restituisce gli id dei giri in conflitto.
+ */
+export function findResourceOverlaps(
+  routes: { id: string; shift: RouteShift; vehicleId: string | null; driverId: string | null }[],
+): Set<string> {
+  const conflicting = new Set<string>();
+  for (let i = 0; i < routes.length; i++) {
+    for (let j = i + 1; j < routes.length; j++) {
+      const a = routes[i];
+      const b = routes[j];
+      const sameVehicle = a.vehicleId && a.vehicleId === b.vehicleId;
+      const sameDriver = a.driverId && a.driverId === b.driverId;
+      if ((sameVehicle || sameDriver) && shiftsOverlap(a.shift, b.shift)) {
+        conflicting.add(a.id);
+        conflicting.add(b.id);
+      }
+    }
+  }
+  return conflicting;
 }

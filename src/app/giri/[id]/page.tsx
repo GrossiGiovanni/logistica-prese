@@ -27,7 +27,7 @@ import {
 import { routeTotalCost, formatEuro } from "@/lib/costs";
 import { addressToQuery } from "@/lib/distance";
 import { RouteMapEmbed } from "@/features/map/RouteMapEmbed";
-import { timeWindowLabels, priorityLabels } from "@/lib/labels";
+import { timeWindowLabels, priorityLabels, routeLabel } from "@/lib/labels";
 import { formatDateIt, toDateInputValue } from "@/lib/dates";
 
 export default async function GiroDettaglioPage({
@@ -59,7 +59,7 @@ export default async function GiroDettaglioPage({
   return (
     <div>
       <PageHeader
-        title="Dettaglio giro"
+        title={routeLabel(route)}
         description={`${formatDateIt(route.routeDate)} · ${route.stops.length} prese · ${totalPallets} pallet`}
       >
         <Link href={`/giri?date=${dateStr}`} className="btn-secondary">

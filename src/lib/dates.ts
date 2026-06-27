@@ -47,6 +47,13 @@ export function tomorrowInputValue(): string {
   return toDateInputValue(d);
 }
 
+/** Data di ieri come stringa "YYYY-MM-DD". */
+export function yesterdayInputValue(): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 1);
+  return toDateInputValue(d);
+}
+
 /** Restituisce la chiave giorno della settimana (es. "monday") per una Date. */
 export function weekdayKey(date: Date): WeekdayKey {
   return WEEKDAY_KEYS[date.getUTCDay()];
