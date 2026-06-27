@@ -25,6 +25,8 @@ import {
   hasMissingData,
 } from "@/lib/warnings";
 import { routeTotalCost, formatEuro } from "@/lib/costs";
+import { addressToQuery } from "@/lib/distance";
+import { RouteMapEmbed } from "@/features/map/RouteMapEmbed";
 import { timeWindowLabels, priorityLabels } from "@/lib/labels";
 import { formatDateIt, toDateInputValue } from "@/lib/dates";
 
@@ -50,6 +52,9 @@ export default async function GiroDettaglioPage({
   const totalCost = routeTotalCost(route);
   const warnings = getRouteWarnings(route);
   const redirectTo = `/giri/${route.id}`;
+
+  const stopAddresses = route.stops.map((s) => addressToQuery(s.pickup.address));
+  const mapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
 
   return (
     <div>
@@ -114,6 +119,11 @@ export default async function GiroDettaglioPage({
           <span className="font-semibold text-slate-900">{formatEuro(totalCost)}</span>
         </div>
       </div>
+
+      <section className="mb-6">
+        <h2 className="mb-2 text-base font-semibold text-slate-900">Percorso del giro</h2>
+        <RouteMapEmbed stopAddresses={stopAddresses} apiKey={mapsApiKey} />
+      </section>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Colonna sinistra: dati giro + fermate */}
