@@ -37,7 +37,7 @@ export function WhatsAppButton({
         (compact ? "px-2 py-1 text-xs" : "px-3 py-2 text-sm")
       }
     >
-      <span aria-hidden>🟢</span> Invia giro su WhatsApp
+      Invia giro su WhatsApp
     </a>
   );
 }

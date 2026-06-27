@@ -36,33 +36,33 @@ export function isValidWhatsappNumber(phone: string | null | undefined): boolean
   return whatsappDigits(phone).length >= 8;
 }
 
-/** Testo del messaggio da inviare all'autista. */
+/** Testo del messaggio da inviare all'autista (solo testo, niente emoji). */
 export function buildWhatsappMessage(route: WhatsappRoute): string {
   const lines: string[] = [];
-  lines.push(`🚚 *${routeLabel(route)}*`);
-  lines.push(`📅 ${formatDateIt(route.routeDate)}`);
-  if (route.vehicle) lines.push(`🚛 Mezzo: ${route.vehicle.name}`);
-  if (route.km != null) lines.push(`📏 Km totali: ${route.km} km`);
-  lines.push(`🏭 Partenza: ${WAREHOUSE_ADDRESS}`);
+  lines.push(`*${routeLabel(route)}*`);
+  lines.push(`Data: ${formatDateIt(route.routeDate)}`);
+  if (route.vehicle) lines.push(`Mezzo: ${route.vehicle.name}`);
+  if (route.km != null) lines.push(`Km totali: ${route.km} km`);
+  lines.push(`Partenza: ${WAREHOUSE_ADDRESS}`);
   lines.push("");
-  lines.push(`📦 Prese (${route.stops.length}):`);
+  lines.push(`PRESE (${route.stops.length}):`);
 
   route.stops.forEach((s, i) => {
     const p = s.pickup;
     const num = p.pickupNumber ? `[${p.pickupNumber}] ` : "";
-    lines.push(`${i + 1}. ${num}${p.customer.name}`);
-    lines.push(`   📍 ${p.address.street}, ${p.address.city} (${p.address.province})`);
+    lines.push(`${i + 1}) ${num}${p.customer.name}`);
+    lines.push(`   ${p.address.street}, ${p.address.city} (${p.address.province})`);
     const meta = [
       timeWindowLabels[p.timeWindow],
       p.pallets != null ? `${p.pallets} pallet` : null,
     ]
       .filter(Boolean)
-      .join(" · ");
-    if (meta) lines.push(`   🕐 ${meta}`);
-    if (p.rawNotes) lines.push(`   📝 ${p.rawNotes}`);
+      .join(" - ");
+    if (meta) lines.push(`   ${meta}`);
+    if (p.rawNotes) lines.push(`   Note: ${p.rawNotes}`);
   });
 
   lines.push("");
-  lines.push(`🏭 Rientro: ${WAREHOUSE_ADDRESS}`);
+  lines.push(`Rientro: ${WAREHOUSE_ADDRESS}`);
   return lines.join("\n");
 }
