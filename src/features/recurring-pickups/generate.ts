@@ -29,46 +29,42 @@ export async function generateRecurringPickups(dateStr: string): Promise<Generat
   const recurrings = await prisma.recurringPickup.findMany({
     where: { active: true, [dayKey]: true },
   });
+  if (recurrings.length === 0) return { created: 0, skipped: 0 };
 
-  let created = 0;
-  let skipped = 0;
+  // Una sola query per sapere quali ricorrenze hanno già la presa del giorno.
+  const existing = await prisma.pickup.findMany({
+    where: { pickupDate: date, recurringPickupId: { in: recurrings.map((r) => r.id) } },
+    select: { recurringPickupId: true },
+  });
+  const existingIds = new Set(existing.map((e) => e.recurringPickupId));
 
-  for (const r of recurrings) {
-    const existing = await prisma.pickup.findFirst({
-      where: { pickupDate: date, recurringPickupId: r.id },
-      select: { id: true },
-    });
-    if (existing) {
-      skipped++;
-      continue;
-    }
+  const toCreate = recurrings.filter((r) => !existingIds.has(r.id));
+  if (toCreate.length === 0) return { created: 0, skipped: recurrings.length };
 
-    // Dati minimi presenti -> READY, altrimenti DRAFT.
-    const hasMinimalData = r.defaultPallets != null;
+  // Creazione in blocco: una sola round-trip al database.
+  await prisma.pickup.createMany({
+    data: toCreate.map((r) => ({
+      pickupDate: date,
+      customerId: r.customerId,
+      addressId: r.addressId,
+      sourceType: "RECURRING" as const,
+      // Dati minimi presenti -> READY, altrimenti DRAFT.
+      status: r.defaultPallets != null ? ("READY" as const) : ("DRAFT" as const),
+      timeWindow: r.defaultTimeWindow,
+      timeFrom: r.defaultTimeFrom,
+      timeTo: r.defaultTimeTo,
+      pallets: r.defaultPallets,
+      colli: r.defaultColli,
+      weightKg: r.defaultWeightKg,
+      volumeM3: r.defaultVolumeM3,
+      requiresTailLift: r.defaultRequiresTailLift,
+      requiresMotrice: r.defaultRequiresMotrice,
+      priority: r.defaultPriority,
+      rawNotes: r.defaultNotes,
+      recurringPickupId: r.id,
+    })),
+    skipDuplicates: true,
+  });
 
-    await prisma.pickup.create({
-      data: {
-        pickupDate: date,
-        customerId: r.customerId,
-        addressId: r.addressId,
-        sourceType: "RECURRING",
-        status: hasMinimalData ? "READY" : "DRAFT",
-        timeWindow: r.defaultTimeWindow,
-        timeFrom: r.defaultTimeFrom,
-        timeTo: r.defaultTimeTo,
-        pallets: r.defaultPallets,
-        colli: r.defaultColli,
-        weightKg: r.defaultWeightKg,
-        volumeM3: r.defaultVolumeM3,
-        requiresTailLift: r.defaultRequiresTailLift,
-        requiresMotrice: r.defaultRequiresMotrice,
-        priority: r.defaultPriority,
-        rawNotes: r.defaultNotes,
-        recurringPickupId: r.id,
-      },
-    });
-    created++;
-  }
-
-  return { created, skipped };
+  return { created: toCreate.length, skipped: recurrings.length - toCreate.length };
 }
