@@ -7,6 +7,7 @@ import { MissingDataBadge } from "@/components/badges/WarningBadge";
 import { DateSelector } from "@/components/ui/DateSelector";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getDailyStats } from "@/features/dashboard/queries";
+import { ensureRecurringForDate } from "@/features/recurring-pickups/generate";
 import { hasMissingData, routeTotalPallets, routeUsesMotrice } from "@/lib/warnings";
 import { routeTotalCost, formatEuro } from "@/lib/costs";
 import { routeShiftLabels, timeWindowLabels } from "@/lib/labels";
@@ -19,6 +20,9 @@ export default async function DashboardPage({
 }) {
   const { date } = await searchParams;
   const selectedDate = date ?? tomorrowInputValue();
+
+  await ensureRecurringForDate(selectedDate);
+
   const { pickups, routes, kpi } = await getDailyStats(selectedDate);
 
   const dailyCost = routes.reduce((sum, r) => sum + (routeTotalCost(r) ?? 0), 0);

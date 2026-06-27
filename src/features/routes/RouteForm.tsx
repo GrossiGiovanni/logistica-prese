@@ -82,8 +82,12 @@ export function RouteForm({
         <Field label="Ora rientro" htmlFor="returnTime" error={errors?.returnTime}>
           <input id="returnTime" name="returnTime" type="time" defaultValue={route?.returnTime ?? ""} className="field-input" />
         </Field>
-        <Field label="Km percorsi" htmlFor="km" error={errors?.km}>
-          <input id="km" name="km" type="number" min={0} step="0.1" defaultValue={route?.km ?? ""} className="field-input" />
+        <Field label="Km percorsi" hint="Calcolati automaticamente dalle fermate (magazzino → prese → magazzino)">
+          <input
+            value={route?.km != null ? `${route.km} km` : "— (in attesa di fermate / API)"}
+            disabled
+            className="field-input bg-slate-50 text-slate-500"
+          />
         </Field>
         <Field label="Note" htmlFor="notes" error={errors?.notes} full>
           <textarea id="notes" name="notes" defaultValue={route?.notes ?? ""} rows={2} className="field-input" />

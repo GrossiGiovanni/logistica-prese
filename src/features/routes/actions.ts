@@ -5,12 +5,41 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { routeSchema, parseForm, type ActionResult } from "@/lib/validations";
 import { parseDateOnly, isValidDateInput } from "@/lib/dates";
+import { computeRouteKm, addressToQuery } from "@/lib/distance";
 
 function revalidateRoutes(routeId?: string) {
   revalidatePath("/giri");
   revalidatePath("/pianificazione");
   revalidatePath("/dashboard");
   if (routeId) revalidatePath(`/giri/${routeId}`);
+}
+
+/**
+ * Ricalcola e salva i km del giro (magazzino → fermate in ordine → magazzino)
+ * tramite Google Directions. Best-effort: se la chiave manca o l'API fallisce,
+ * azzera a null senza interrompere l'operazione chiamante.
+ */
+export async function recalcRouteKm(routeId: string): Promise<void> {
+  try {
+    const stops = await prisma.routeStop.findMany({
+      where: { routeId },
+      orderBy: { sequence: "asc" },
+      select: {
+        pickup: {
+          select: {
+            address: {
+              select: { street: true, city: true, province: true, postalCode: true },
+            },
+          },
+        },
+      },
+    });
+    const addresses = stops.map((s) => addressToQuery(s.pickup.address));
+    const result = await computeRouteKm(addresses);
+    await prisma.route.update({ where: { id: routeId }, data: { km: result.km } });
+  } catch (err) {
+    console.warn("[recalcRouteKm] errore:", err);
+  }
 }
 
 /** Stato a cui torna una presa rimossa da un giro, in base ai dati. */
@@ -64,6 +93,15 @@ export async function updateRoute(
 
   revalidateRoutes(id);
   return { ok: true };
+}
+
+/** Ricalcola manualmente i km del giro (bottone "Ricalcola KM"). */
+export async function recalculateRouteKm(formData: FormData): Promise<void> {
+  const id = formData.get("id") as string;
+  if (!id) return;
+  await recalcRouteKm(id);
+  revalidateRoutes(id);
+  redirect(`/giri/${id}`);
 }
 
 /** Cambia lo stato del giro (DRAFT/CONFIRMED). */
@@ -123,6 +161,7 @@ export async function assignPickupToRoute(formData: FormData): Promise<void> {
       prisma.routeStop.create({ data: { routeId, pickupId, sequence: nextSeq } }),
       prisma.pickup.update({ where: { id: pickupId }, data: { status: "PLANNED" } }),
     ]);
+    await recalcRouteKm(routeId);
   }
 
   revalidateRoutes(routeId);
@@ -137,6 +176,7 @@ export async function removePickupFromRoute(formData: FormData): Promise<void> {
   if (!routeId || !pickupId) return;
 
   await prisma.routeStop.deleteMany({ where: { routeId, pickupId } });
+  await recalcRouteKm(routeId);
 
   const stillAssigned = await prisma.routeStop.count({ where: { pickupId } });
   if (stillAssigned === 0) {
@@ -181,6 +221,7 @@ export async function moveStop(formData: FormData): Promise<void> {
     prisma.routeStop.update({ where: { id: a.id }, data: { sequence: b.sequence } }),
     prisma.routeStop.update({ where: { id: b.id }, data: { sequence: a.sequence } }),
   ]);
+  await recalcRouteKm(routeId);
 
   revalidateRoutes(routeId);
   redirect(`/giri/${routeId}`);

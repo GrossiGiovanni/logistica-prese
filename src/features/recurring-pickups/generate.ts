@@ -1,8 +1,18 @@
 // Modulo server-only: usa prisma, va importato solo lato server.
 import { prisma } from "@/lib/db";
-import { parseDateOnly, weekdayKey } from "@/lib/dates";
+import { parseDateOnly, weekdayKey, todayInputValue } from "@/lib/dates";
 
 export type GenerateResult = { created: number; skipped: number };
+
+/**
+ * Genera le prese fisse per la data se è oggi o futura (non riscrive lo storico).
+ * Idempotente: pensata per essere chiamata all'apertura di pianificazione/dashboard
+ * così le ricorrenze con giorni+quantità compaiono senza un click manuale.
+ */
+export async function ensureRecurringForDate(dateStr: string): Promise<void> {
+  if (dateStr < todayInputValue()) return; // non backfilla le date passate
+  await generateRecurringPickups(dateStr);
+}
 
 /**
  * Genera le prese del giorno a partire dalle prese fisse attive.

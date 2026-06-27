@@ -15,6 +15,7 @@ import {
   assignPickupToRoute,
   setRouteStatus,
   deleteRoute,
+  recalculateRouteKm,
 } from "@/features/routes/actions";
 import {
   routeTotalPallets,
@@ -94,9 +95,19 @@ export default async function GiroDettaglioPage({
             {route.departureTime ?? "—"} → {route.returnTime ?? "—"}
           </span>
         </div>
-        <div>
-          <span className="text-slate-500">Km: </span>
-          <span className="font-medium text-slate-800">{route.km ?? "—"}</span>
+        <div className="flex items-center gap-2">
+          <span>
+            <span className="text-slate-500">Km: </span>
+            <span className="font-medium text-slate-800">
+              {route.km != null ? `${route.km} km` : "—"}
+            </span>
+          </span>
+          <form action={recalculateRouteKm}>
+            <input type="hidden" name="id" value={route.id} />
+            <button type="submit" className="btn-secondary px-2 py-1 text-xs" title="Ricalcola i km dalle fermate">
+              Ricalcola
+            </button>
+          </form>
         </div>
         <div>
           <span className="text-slate-500">Costo stimato: </span>

@@ -10,6 +10,7 @@ import { getDailyStats } from "@/features/dashboard/queries";
 import { listUnassignedPickups } from "@/features/pickups/queries";
 import { assignPickupToRoute } from "@/features/routes/actions";
 import { GenerateRecurringForm } from "@/features/recurring-pickups/GenerateRecurringForm";
+import { ensureRecurringForDate } from "@/features/recurring-pickups/generate";
 import {
   routeTotalPallets,
   routeUsesMotrice,
@@ -28,6 +29,10 @@ export default async function PianificazionePage({
   const { date } = await searchParams;
   const selectedDate = date ?? tomorrowInputValue();
   const redirectTo = `/pianificazione?date=${selectedDate}`;
+
+  // Materializza le prese fisse del giorno (idempotente, solo oggi/futuro)
+  // così le ricorrenze compaiono senza dover cliccare "Genera prese fisse".
+  await ensureRecurringForDate(selectedDate);
 
   const [{ routes, kpi }, unassigned] = await Promise.all([
     getDailyStats(selectedDate),
