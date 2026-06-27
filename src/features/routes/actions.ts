@@ -36,7 +36,11 @@ export async function recalcRouteKm(routeId: string): Promise<void> {
     });
     const addresses = stops.map((s) => addressToQuery(s.pickup.address));
     const result = await computeRouteKm(addresses);
-    await prisma.route.update({ where: { id: routeId }, data: { km: result.km } });
+    // Salva solo se abbiamo un km valido o se il giro è vuoto (km=null corretto).
+    // In caso di chiave assente o errore API NON sovrascrive l'ultimo km buono.
+    if (result.km != null || result.reason === "no_stops") {
+      await prisma.route.update({ where: { id: routeId }, data: { km: result.km } });
+    }
   } catch (err) {
     console.warn("[recalcRouteKm] errore:", err);
   }

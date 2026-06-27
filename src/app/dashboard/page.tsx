@@ -104,6 +104,7 @@ export default async function DashboardPage({
                     </div>
                     <div className="text-xs text-slate-500">
                       {routeShiftLabels[r.shift]} · {r.driver?.name ?? "—"} · {r.stops.length} prese · {routeTotalPallets(r)} pallet
+                      {r.km != null ? ` · ${r.km} km` : ""}
                       {routeTotalCost(r) != null ? ` · ${formatEuro(routeTotalCost(r))}` : ""}
                     </div>
                   </div>

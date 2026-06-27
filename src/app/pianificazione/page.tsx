@@ -154,6 +154,7 @@ export default async function PianificazionePage({
                             {total}
                             {r.vehicle?.capacityPallets != null ? ` / ${r.vehicle.capacityPallets}` : ""} pallet
                           </span>
+                          {r.km != null ? ` · ${r.km} km` : ""}
                           {routeTotalCost(r) != null ? ` · ${formatEuro(routeTotalCost(r))}` : ""}
                         </div>
                       </div>
