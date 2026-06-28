@@ -11,7 +11,7 @@ import { routeInclude } from "@/features/routes/queries";
 export async function getDailyStats(dateStr: string) {
   const date = parseDateOnly(dateStr);
 
-  const [pickups, routes] = await Promise.all([
+  const [pickups, routes, availableVehicles] = await Promise.all([
     prisma.pickup.findMany({
       where: { pickupDate: date, status: { not: "CANCELLED" } },
       include: pickupInclude,
@@ -22,6 +22,7 @@ export async function getDailyStats(dateStr: string) {
       include: routeInclude,
       orderBy: [{ shift: "asc" }, { createdAt: "asc" }],
     }),
+    prisma.vehicle.count({ where: { active: true } }),
   ]);
 
   const total = pickups.length;
@@ -48,6 +49,7 @@ export async function getDailyStats(dateStr: string) {
       missingData,
       routesCount: routes.length,
       vehiclesUsed: usedVehicleIds.size,
+      availableVehicles,
       motriciUsed,
     },
   };

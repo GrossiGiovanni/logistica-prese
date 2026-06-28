@@ -41,15 +41,20 @@ export default async function DashboardPage({
       </PageHeader>
 
       <KpiGrid>
-        <KpiCard label="Prese totali" value={kpi.total} />
-        <KpiCard label="Prese fisse" value={kpi.recurring} tone="blue" />
-        <KpiCard label="Prese spot" value={kpi.spot} />
-        <KpiCard label="Non assegnate" value={kpi.unassigned} tone={kpi.unassigned > 0 ? "amber" : "green"} />
-        <KpiCard label="Dati mancanti" value={kpi.missingData} tone={kpi.missingData > 0 ? "amber" : "green"} />
-        <KpiCard label="Giri creati" value={kpi.routesCount} />
-        <KpiCard label="Mezzi usati" value={kpi.vehiclesUsed} />
-        <KpiCard label="Motrici usate" value={kpi.motriciUsed} tone={kpi.motriciUsed > 0 ? "red" : "default"} hint="Costo alto" />
-        <KpiCard label="Costo giornata" value={dailyCost > 0 ? formatEuro(dailyCost) : "—"} hint="Stima giri del giorno" />
+        <KpiCard
+          label="Prese totali / da assegnare"
+          value={`${kpi.total} / ${kpi.unassigned}`}
+          tone={kpi.unassigned > 0 ? "amber" : "green"}
+        />
+        <KpiCard
+          label="Costo totale giornata"
+          value={dailyCost > 0 ? formatEuro(dailyCost) : "—"}
+          hint="Stima giri del giorno"
+        />
+        <KpiCard
+          label="Mezzi disponibili / assegnati"
+          value={`${kpi.availableVehicles} / ${kpi.vehiclesUsed}`}
+        />
       </KpiGrid>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
