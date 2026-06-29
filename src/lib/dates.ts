@@ -54,6 +54,13 @@ export function yesterdayInputValue(): string {
   return toDateInputValue(d);
 }
 
+/** Aggiunge (o sottrae) giorni a una data "YYYY-MM-DD". */
+export function addDaysInput(value: string, days: number): string {
+  const d = parseDateOnly(value);
+  d.setUTCDate(d.getUTCDate() + days);
+  return toDateInputValue(d);
+}
+
 /** Restituisce la chiave giorno della settimana (es. "monday") per una Date. */
 export function weekdayKey(date: Date): WeekdayKey {
   return WEEKDAY_KEYS[date.getUTCDay()];

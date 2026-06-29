@@ -21,7 +21,7 @@ import {
 } from "@/lib/warnings";
 import { routeTotalCost, formatEuro } from "@/lib/costs";
 import { routeShiftLabels, priorityLabels, routeLabel } from "@/lib/labels";
-import { formatDateIt, tomorrowInputValue, parseDateOnly } from "@/lib/dates";
+import { formatDateIt, tomorrowInputValue, parseDateOnly, toDateInputValue } from "@/lib/dates";
 import { UnassignedFilters } from "@/features/pickups/UnassignedFilters";
 import { PickupShiftSelect } from "@/features/pickups/PickupShiftSelect";
 import { WhatsAppButton } from "@/features/routes/WhatsAppButton";
@@ -60,8 +60,9 @@ export default async function PianificazionePage({
     }),
   ]);
 
-  // Conflitti di risorsa (stesso mezzo/autista su fasce sovrapposte) tra i giri del giorno.
-  const overlapIds = findResourceOverlaps(routes);
+  // Conflitti di risorsa (stesso mezzo/autista su fasce sovrapposte) — solo tra i
+  // giri effettivamente impegnati (con almeno una presa): un giro vuoto non è in conflitto.
+  const overlapIds = findResourceOverlaps(routes.filter((r) => r.stops.length > 0));
 
   return (
     <div>
@@ -115,6 +116,9 @@ export default async function PianificazionePage({
                     <Link href={`/prese/${p.id}/modifica`} className="font-medium text-slate-800 hover:underline">
                       {p.customer.name}
                     </Link>
+                    {toDateInputValue(p.pickupDate) !== selectedDate ? (
+                      <Badge tone="red">Da recuperare · {formatDateIt(p.pickupDate)}</Badge>
+                    ) : null}
                     {p.priority !== "NORMAL" ? <Badge tone="red">{priorityLabels[p.priority]}</Badge> : null}
                     {p.requiresMotrice ? <Badge tone="purple">Motrice</Badge> : null}
                     {p.requiresTailLift ? <Badge tone="blue">Sponda</Badge> : null}

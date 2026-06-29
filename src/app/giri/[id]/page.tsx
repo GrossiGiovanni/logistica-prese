@@ -251,7 +251,13 @@ export default async function GiroDettaglioPage({
                 <li key={p.id} className="card flex items-start justify-between gap-3 p-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
+                      {p.pickupNumber ? (
+                        <span className="font-mono text-xs font-semibold text-brand-700">{p.pickupNumber}</span>
+                      ) : null}
                       <span className="font-medium text-slate-800">{p.customer.name}</span>
+                      {toDateInputValue(p.pickupDate) !== dateStr ? (
+                        <Badge tone="red">Da recuperare · {formatDateIt(p.pickupDate)}</Badge>
+                      ) : null}
                       {p.priority !== "NORMAL" ? <Badge tone="red">{priorityLabels[p.priority]}</Badge> : null}
                       {p.requiresMotrice ? <Badge tone="purple">Motrice</Badge> : null}
                       {hasMissingData(p) ? <MissingDataBadge /> : null}

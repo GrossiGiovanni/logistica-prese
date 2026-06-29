@@ -9,9 +9,10 @@ import { listPickups, type PickupWithRelations } from "@/features/pickups/querie
 import { cancelPickup } from "@/features/pickups/actions";
 import { PickupFiltersBar } from "@/features/pickups/PickupFilters";
 import { hasMissingData } from "@/lib/warnings";
-import { pickupSourceLabels, timeWindowLabels, priorityLabels } from "@/lib/labels";
-import { formatDateIt } from "@/lib/dates";
+import { pickupSourceLabels, timeWindowLabels, priorityLabels, routeStatusLabels, routeLabel } from "@/lib/labels";
+import { formatDateIt, todayInputValue, addDaysInput, parseDateOnly } from "@/lib/dates";
 import { getPreseFilters, getOpDate } from "@/lib/persisted-filters";
+import { RouteStatusBadge } from "@/components/badges/StatusBadge";
 import type { PickupStatus, PickupSourceType, TimeWindow } from "@prisma/client";
 
 export default async function PresePage({
@@ -21,15 +22,25 @@ export default async function PresePage({
 }) {
   const sp = await searchParams;
   const [saved, opDate] = await Promise.all([getPreseFilters(), getOpDate()]);
-  // I filtri persistono nei cookie; la data può arrivare anche dall'URL.
+
+  // Vista per giornata: una data è sempre selezionata. Quando c'è una ricerca,
+  // si cerca su TUTTE le date (così trovi una presa qualsiasi e il suo giro).
+  const searching = Boolean(saved.search);
+  const viewDate = sp.date || opDate || todayInputValue();
+
   const filters = {
-    date: sp.date || opDate || undefined,
+    date: searching ? undefined : viewDate,
     status: (saved.status as PickupStatus) || undefined,
     sourceType: (saved.sourceType as PickupSourceType) || undefined,
     timeWindow: (saved.timeWindow as TimeWindow) || undefined,
     search: saved.search || undefined,
   };
   const pickups = await listPickups(filters);
+
+  // Stato per la barra filtri: mostra sempre la data corrente.
+  const barCurrent = { ...filters, date: viewDate };
+  const prevDate = addDaysInput(viewDate, -1);
+  const nextDate = addDaysInput(viewDate, 1);
 
   const columns: Column<PickupWithRelations>[] = [
     {
@@ -80,6 +91,28 @@ export default async function PresePage({
       ),
     },
     {
+      header: "Giro / Viaggio",
+      cell: (p) => {
+        const rs = p.routeStops[0];
+        if (!rs?.route) return <Badge tone="slate">Non assegnata</Badge>;
+        const r = rs.route;
+        return (
+          <div className="text-xs">
+            <div className="font-medium text-slate-700">{routeLabel(r)}</div>
+            <div className="text-slate-500">
+              {formatDateIt(r.routeDate)} · {routeStatusLabels[r.status]}
+            </div>
+            <div className="mt-0.5 flex items-center gap-2">
+              <RouteStatusBadge status={r.status} />
+              <Link href={`/giri/${r.id}`} className="text-brand-700 hover:underline">
+                Apri giro →
+              </Link>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
       header: "",
       className: "text-right",
       cell: (p) => (
@@ -100,16 +133,35 @@ export default async function PresePage({
     <div>
       <PageHeader
         title="Prese"
-        description="Tutte le prese/ritiri"
+        description={
+          searching
+            ? "Risultati ricerca (tutte le date)"
+            : `Prese del ${formatDateIt(parseDateOnly(viewDate))}`
+        }
         action={{ href: "/prese/nuova", label: "Nuova presa" }}
       />
-      <PickupFiltersBar current={filters} />
+
+      {!searching ? (
+        <div className="mb-3 flex items-center gap-2">
+          <Link href={`/prese?date=${prevDate}`} className="btn-secondary">← Giorno prec.</Link>
+          <Link href={`/prese?date=${todayInputValue()}`} className="btn-secondary">Oggi</Link>
+          <Link href={`/prese?date=${nextDate}`} className="btn-secondary">Giorno succ. →</Link>
+        </div>
+      ) : (
+        <div className="mb-3 rounded-md border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-700">
+          Ricerca attiva su tutte le date. Cancella la ricerca per tornare alla vista per giornata.
+        </div>
+      )}
+
+      <PickupFiltersBar current={barCurrent} />
       <DataTable
         columns={columns}
         rows={pickups}
         empty={{
           title: "Nessuna presa",
-          description: "Nessuna presa corrisponde ai filtri.",
+          description: searching
+            ? "Nessuna presa corrisponde alla ricerca."
+            : "Nessuna presa per questa giornata.",
           action: { href: "/prese/nuova", label: "Nuova presa" },
         }}
       />
