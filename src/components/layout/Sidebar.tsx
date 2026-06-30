@@ -11,7 +11,6 @@ const nav = [
   { href: "/prese-fisse", label: "Prese fisse" },
   { href: "/giri", label: "Giri" },
   { href: "/clienti", label: "Clienti" },
-  { href: "/indirizzi", label: "Indirizzi" },
   { href: "/autisti", label: "Autisti" },
   { href: "/mezzi", label: "Mezzi" },
 ];

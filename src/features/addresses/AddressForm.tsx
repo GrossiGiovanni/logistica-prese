@@ -22,6 +22,9 @@ export function AddressForm({
   );
   const errors = state && !state.ok ? state.fieldErrors : undefined;
 
+  const backCustomerId = address?.customerId ?? defaultCustomerId;
+  const backHref = backCustomerId ? `/clienti/${backCustomerId}/modifica` : "/clienti";
+
   return (
     <form action={formAction} className="space-y-4">
       {address ? <input type="hidden" name="id" value={address.id} /> : null}
@@ -74,7 +77,7 @@ export function AddressForm({
         <ConfirmButton variant="primary">
           {address ? "Salva modifiche" : "Crea indirizzo"}
         </ConfirmButton>
-        <a href="/indirizzi" className="btn-secondary">
+        <a href={backHref} className="btn-secondary">
           Annulla
         </a>
       </div>

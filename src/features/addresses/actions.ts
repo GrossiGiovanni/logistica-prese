@@ -39,20 +39,28 @@ export async function upsertAddress(
     });
   }
 
-  revalidatePath("/indirizzi");
-  redirect("/indirizzi");
+  // Gli indirizzi si gestiscono dalla scheda cliente.
+  const customerPath = `/clienti/${data.customerId}/modifica`;
+  revalidatePath(customerPath);
+  redirect(customerPath);
 }
 
 export async function deleteAddress(formData: FormData): Promise<void> {
   const id = formData.get("id") as string;
   if (!id) return;
 
-  const pickupsCount = await prisma.pickup.count({ where: { addressId: id } });
-  if (pickupsCount > 0) {
-    redirect(`/indirizzi?error=has-pickups`);
+  const address = await prisma.address.findUnique({
+    where: { id },
+    select: { customerId: true, _count: { select: { pickups: true } } },
+  });
+  if (!address) return;
+
+  const customerPath = `/clienti/${address.customerId}/modifica`;
+  if (address._count.pickups > 0) {
+    redirect(`${customerPath}?error=has-pickups`);
   }
 
   await prisma.address.delete({ where: { id } });
-  revalidatePath("/indirizzi");
-  redirect("/indirizzi");
+  revalidatePath(customerPath);
+  redirect(customerPath);
 }

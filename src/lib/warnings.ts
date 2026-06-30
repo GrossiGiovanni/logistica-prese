@@ -168,13 +168,14 @@ export function routeTotalLoadingMeters(route: RouteWithRelations): number {
   return route.stops.reduce((sum, stop) => sum + (stop.pickup.loadingMeters ?? 0), 0);
 }
 
-/** Metri di carico occupati da un pallet (EUR): ~2 pallet per 0,8 m. */
+// Pallet EUR 80×120 cm: in un mezzo largo ~2,4 m stanno 2 pallet affiancati
+// ogni 0,8 m di lunghezza → 0,4 m di carico per pallet.
 export const METERS_PER_PALLET = 0.4;
 
 /**
  * Metri occupati sul mezzo dalle prese del giro: usa i metri lineari dichiarati
- * (MTL) se presenti, altrimenti li stima dai pallet (pallet × 0,4 m).
- * Es. 14 pallet ≈ 5,6 m.
+ * (MTL) se presenti, altrimenti li stima dai pallet (pallet × 0,4 m), arrotondato
+ * al metro. Es. 14 pallet × 0,4 = 5,6 → 6 m.
  */
 export function routeOccupiedMeters(route: RouteWithRelations): number {
   const m = route.stops.reduce((sum, stop) => {
@@ -182,7 +183,7 @@ export function routeOccupiedMeters(route: RouteWithRelations): number {
     const meters = p.loadingMeters ?? (p.pallets != null ? p.pallets * METERS_PER_PALLET : 0);
     return sum + meters;
   }, 0);
-  return Math.round(m * 10) / 10; // 1 decimale
+  return Math.round(m);
 }
 
 /** True se il giro usa una motrice (mezzo costoso). */
