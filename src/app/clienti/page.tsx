@@ -33,6 +33,9 @@ export default async function ClientiPage({
       className: "text-right",
       cell: (c) => (
         <div className="flex justify-end gap-2">
+          <Link href={`/indirizzi/nuovo?customerId=${c.id}`} className="btn-secondary">
+            + Indirizzo
+          </Link>
           <Link href={`/clienti/${c.id}/modifica`} className="btn-secondary">
             Modifica
           </Link>

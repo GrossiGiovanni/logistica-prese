@@ -36,6 +36,11 @@ export function PickupForm({
   const selectedCustomer = customers.find((c) => c.id === customerId);
   const addresses = selectedCustomer?.addresses ?? [];
 
+  // Creazione rapida (solo in inserimento)
+  const [newCustomer, setNewCustomer] = useState(false);
+  const [newAddress, setNewAddress] = useState(false);
+  const addrNew = newCustomer || newAddress;
+
   return (
     <form action={formAction} className="space-y-4">
       {pickup ? <input type="hidden" name="id" value={pickup.id} /> : null}
@@ -61,37 +66,79 @@ export function PickupForm({
             ))}
           </select>
         </Field>
-        <Field label="Cliente *" htmlFor="customerId" error={errors?.customerId}>
-          <select
-            id="customerId"
-            name="customerId"
-            value={customerId}
-            onChange={(e) => setCustomerId(e.target.value)}
-            required
-            className="field-input"
-          >
-            <option value="" disabled>Seleziona cliente…</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+        <Field label="Cliente *" htmlFor="customerId" error={errors?.customerId} full>
+          {!pickup ? (
+            <label className="mb-1 flex items-center gap-2 text-xs text-slate-500">
+              <input
+                type="checkbox"
+                checked={newCustomer}
+                onChange={(e) => {
+                  setNewCustomer(e.target.checked);
+                  if (e.target.checked) setNewAddress(true);
+                }}
+              />
+              Nuovo cliente (crea al volo)
+            </label>
+          ) : null}
+          {newCustomer ? (
+            <input
+              name="newCustomerName"
+              placeholder="Nome nuovo cliente"
+              required
+              className="field-input"
+            />
+          ) : (
+            <select
+              id="customerId"
+              name="customerId"
+              value={customerId}
+              onChange={(e) => setCustomerId(e.target.value)}
+              required
+              className="field-input"
+            >
+              <option value="" disabled>Seleziona cliente…</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          )}
         </Field>
-        <Field label="Indirizzo *" htmlFor="addressId" error={errors?.addressId}>
-          <select
-            id="addressId"
-            name="addressId"
-            defaultValue={pickup?.addressId ?? ""}
-            required
-            disabled={!customerId}
-            className="field-input"
-          >
-            <option value="" disabled>{customerId ? "Seleziona indirizzo…" : "Scegli prima il cliente"}</option>
-            {addresses.map((a) => (
-              <option key={a.id} value={a.id}>
-                {(a.label ? a.label + " — " : "") + a.street + ", " + a.city + " (" + a.province + ")"}
-              </option>
-            ))}
-          </select>
+        <Field label="Indirizzo *" htmlFor="addressId" error={errors?.addressId} full>
+          {!pickup && !newCustomer ? (
+            <label className="mb-1 flex items-center gap-2 text-xs text-slate-500">
+              <input
+                type="checkbox"
+                checked={newAddress}
+                onChange={(e) => setNewAddress(e.target.checked)}
+              />
+              Nuovo indirizzo per questo cliente
+            </label>
+          ) : null}
+          {addrNew && !pickup ? (
+            <div className="grid grid-cols-2 gap-2">
+              <input name="newStreet" placeholder="Via e civico *" required className="field-input col-span-2" />
+              <input name="newCity" placeholder="Città *" required className="field-input" />
+              <input name="newProvince" placeholder="Prov. *" required maxLength={4} className="field-input" />
+              <input name="newPostalCode" placeholder="CAP" className="field-input" />
+              <input name="newLabel" placeholder="Etichetta (es. Magazzino)" className="field-input" />
+            </div>
+          ) : (
+            <select
+              id="addressId"
+              name="addressId"
+              defaultValue={pickup?.addressId ?? ""}
+              required
+              disabled={!customerId}
+              className="field-input"
+            >
+              <option value="" disabled>{customerId ? "Seleziona indirizzo…" : "Scegli prima il cliente"}</option>
+              {addresses.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {(a.label ? a.label + " — " : "") + a.street + ", " + a.city + " (" + a.province + ")"}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
         <Field label="Stato *" htmlFor="status" error={errors?.status}>
           <select id="status" name="status" defaultValue={pickup?.status ?? "READY"} className="field-input">

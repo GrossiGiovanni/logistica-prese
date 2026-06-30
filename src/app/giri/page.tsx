@@ -6,9 +6,8 @@ import { RouteStatusBadge } from "@/components/badges/StatusBadge";
 import { RouteWarningBadges } from "@/components/badges/WarningBadge";
 import { DateSelector } from "@/components/ui/DateSelector";
 import { listRoutes } from "@/features/routes/queries";
-import { ensureDailyRoutes } from "@/features/routes/ensure-daily";
 import { getOpDate } from "@/lib/persisted-filters";
-import { routeTotalPallets, routeUsesMotrice, getRouteWarnings } from "@/lib/warnings";
+import { routeTotalPallets, routeOccupiedMeters, routeUsesMotrice, getRouteWarnings } from "@/lib/warnings";
 import { routeShiftLabels, routeLabel } from "@/lib/labels";
 import { formatDateIt, tomorrowInputValue, parseDateOnly } from "@/lib/dates";
 
@@ -19,7 +18,6 @@ export default async function GiriPage({
 }) {
   const { date } = await searchParams;
   const selectedDate = date ?? (await getOpDate()) ?? tomorrowInputValue();
-  await ensureDailyRoutes(selectedDate);
   const routes = await listRoutes(selectedDate);
 
   return (
@@ -66,6 +64,7 @@ export default async function GiriPage({
                       {route.vehicle?.capacityPallets != null
                         ? ` / ${route.vehicle.capacityPallets}`
                         : ""}
+                      {` · ${routeOccupiedMeters(route)} m`}
                     </div>
                   </div>
                   <div className="max-w-md">

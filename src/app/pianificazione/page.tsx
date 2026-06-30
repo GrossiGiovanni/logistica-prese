@@ -11,9 +11,9 @@ import { listUnassignedPickups } from "@/features/pickups/queries";
 import { assignPickupToRoute, deleteRoute } from "@/features/routes/actions";
 import { GenerateRecurringForm } from "@/features/recurring-pickups/GenerateRecurringForm";
 import { ensureRecurringForDate } from "@/features/recurring-pickups/generate";
-import { ensureDailyRoutes } from "@/features/routes/ensure-daily";
 import {
   routeTotalPallets,
+  routeOccupiedMeters,
   routeUsesMotrice,
   getRouteWarnings,
   findResourceOverlaps,
@@ -44,12 +44,9 @@ export default async function PianificazionePage({
   const selectedDate = date ?? opDate ?? tomorrowInputValue();
   const redirectTo = `/pianificazione?date=${selectedDate}`;
 
-  // Materializza prese fisse e giri predefiniti del giorno (idempotente, solo
-  // oggi/futuro): le ricorrenze e i giri per autista compaiono senza azioni manuali.
-  await Promise.all([
-    ensureRecurringForDate(selectedDate),
-    ensureDailyRoutes(selectedDate),
-  ]);
+  // Materializza le prese fisse del giorno (idempotente). I giri NON sono
+  // automatici: l'operatore li crea manualmente.
+  await ensureRecurringForDate(selectedDate);
 
   const [{ routes, kpi }, unassigned] = await Promise.all([
     getDailyStats(selectedDate),
@@ -194,6 +191,7 @@ export default async function PianificazionePage({
                             {total}
                             {r.vehicle?.capacityPallets != null ? ` / ${r.vehicle.capacityPallets}` : ""} pallet
                           </span>
+                          {` · ${routeOccupiedMeters(r)} m`}
                           {r.km != null ? ` · ${r.km} km` : ""}
                           {routeTotalCost(r) != null ? ` · ${formatEuro(routeTotalCost(r))}` : ""}
                         </div>

@@ -3,14 +3,55 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { geocodeAddress } from "@/lib/geocode";
 import { pickupSchema, parseForm, type ActionResult } from "@/lib/validations";
 import { parseDateOnly } from "@/lib/dates";
+
+function field(formData: FormData, key: string): string {
+  return ((formData.get(key) as string | null) ?? "").trim();
+}
 
 export async function upsertPickup(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
   const id = (formData.get("id") as string) || undefined;
+
+  // Creazione rapida (solo in inserimento): nuovo cliente e/o nuovo indirizzo.
+  if (!id) {
+    const newCustomerName = field(formData, "newCustomerName");
+    if (newCustomerName) {
+      const c = await prisma.customer.create({ data: { name: newCustomerName } });
+      formData.set("customerId", c.id);
+    }
+
+    const newStreet = field(formData, "newStreet");
+    if (newStreet) {
+      const customerId = field(formData, "customerId");
+      if (!customerId) return { ok: false, error: "Seleziona o crea prima un cliente." };
+      const city = field(formData, "newCity");
+      const province = field(formData, "newProvince");
+      if (!city || !province) {
+        return { ok: false, error: "Indirizzo incompleto: via, città e provincia sono obbligatori." };
+      }
+      const postalCode = field(formData, "newPostalCode") || undefined;
+      const label = field(formData, "newLabel") || undefined;
+      const coords = await geocodeAddress({ street: newStreet, city, province, postalCode });
+      const a = await prisma.address.create({
+        data: {
+          customerId,
+          street: newStreet,
+          city,
+          province,
+          postalCode,
+          label,
+          ...(coords ? { lat: coords.lat, lng: coords.lng } : {}),
+        },
+      });
+      formData.set("addressId", a.id);
+    }
+  }
+
   const parsed = parseForm(pickupSchema, formData);
   if (!parsed.success) return parsed.result;
 

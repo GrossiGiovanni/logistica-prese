@@ -21,6 +21,7 @@ import {
   routeTotalPallets,
   routeTotalVolume,
   routeTotalWeight,
+  routeOccupiedMeters,
   getRouteWarnings,
   hasMissingData,
 } from "@/lib/warnings";
@@ -55,6 +56,7 @@ export default async function GiroDettaglioPage({
   const totalPallets = routeTotalPallets(route);
   const totalVolume = routeTotalVolume(route);
   const totalWeight = routeTotalWeight(route);
+  const totalMeters = routeOccupiedMeters(route);
   const totalCost = routeTotalCost(route);
   const warnings = getRouteWarnings(route);
   const redirectTo = `/giri/${route.id}`;
@@ -99,9 +101,11 @@ export default async function GiroDettaglioPage({
           <span className="text-slate-500">Carico: </span>
           <span className="font-medium text-slate-800">
             {totalPallets} plt
+            {route.vehicle?.capacityPallets != null ? ` / ${route.vehicle.capacityPallets}` : ""}
+            {" · "}
+            {totalMeters} m
             {totalVolume > 0 ? ` · ${totalVolume.toFixed(1)} m³` : ""}
             {totalWeight > 0 ? ` · ${totalWeight.toFixed(0)} kg` : ""}
-            {route.vehicle?.capacityPallets != null ? ` / ${route.vehicle.capacityPallets} plt` : ""}
           </span>
         </div>
         <div>
