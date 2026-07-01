@@ -71,14 +71,16 @@ export default async function PresePage({
     { header: "Fascia", cell: (p) => timeWindowLabels[p.timeWindow] },
     {
       header: "Quantità",
-      cell: (p) =>
-        [
-          p.pallets != null ? `${p.pallets} plt` : null,
-          p.loadingMeters != null ? `${p.loadingMeters} mtl` : null,
-          p.volumeM3 != null ? `${p.volumeM3} m³` : null,
-        ]
-          .filter(Boolean)
-          .join(" · ") || "—",
+      cell: (p) => {
+        const parts: string[] = [];
+        if (p.pallets != null) {
+          parts.push(`${p.pallets} plt (≈ ${(p.pallets * 0.4).toFixed(1)} m)`);
+        } else if (p.loadingMeters != null) {
+          parts.push(`${p.loadingMeters} mtl (≈ ${Math.round(p.loadingMeters * 2.5)} plt)`);
+        }
+        if (p.volumeM3 != null) parts.push(`${p.volumeM3} m³`);
+        return parts.join(" · ") || "—";
+      },
     },
     { header: "Priorità", cell: (p) => priorityLabels[p.priority] },
     {

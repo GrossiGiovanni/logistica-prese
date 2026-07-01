@@ -10,10 +10,10 @@ type Row = Awaited<ReturnType<typeof listCustomers>>[number];
 export default async function ClientiPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; q?: string }>;
 }) {
-  const { error } = await searchParams;
-  const customers = await listCustomers();
+  const { error, q } = await searchParams;
+  const customers = await listCustomers(q);
 
   const columns: Column<Row>[] = [
     {
@@ -65,12 +65,30 @@ export default async function ClientiPage({
           Impossibile eliminare: il cliente ha prese collegate.
         </p>
       ) : null}
+
+      <form method="get" className="mb-4 flex flex-wrap items-end gap-2">
+        <div className="grow">
+          <label className="field-label">Cerca cliente</label>
+          <input
+            type="text"
+            name="q"
+            defaultValue={q ?? ""}
+            placeholder="Nome, città, indirizzo, telefono, email…"
+            className="field-input"
+          />
+        </div>
+        <button type="submit" className="btn-primary">Cerca</button>
+        {q ? <a href="/clienti" className="btn-secondary">Azzera</a> : null}
+      </form>
+
       <DataTable
         columns={columns}
         rows={customers}
         empty={{
-          title: "Nessun cliente",
-          description: "Crea il primo cliente per iniziare.",
+          title: q ? "Nessun cliente trovato" : "Nessun cliente",
+          description: q
+            ? `Nessun cliente corrisponde a "${q}".`
+            : "Crea il primo cliente per iniziare.",
           action: { href: "/clienti/nuovo", label: "Nuovo cliente" },
         }}
       />

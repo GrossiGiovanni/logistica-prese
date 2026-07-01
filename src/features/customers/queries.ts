@@ -1,7 +1,31 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
-export function listCustomers() {
+export function listCustomers(search?: string) {
+  const where: Prisma.CustomerWhereInput = {};
+  if (search && search.trim()) {
+    const q = search.trim();
+    where.OR = [
+      { name: { contains: q, mode: "insensitive" } },
+      { vatNumber: { contains: q, mode: "insensitive" } },
+      { phone: { contains: q, mode: "insensitive" } },
+      { email: { contains: q, mode: "insensitive" } },
+      { notes: { contains: q, mode: "insensitive" } },
+      {
+        addresses: {
+          some: {
+            OR: [
+              { city: { contains: q, mode: "insensitive" } },
+              { street: { contains: q, mode: "insensitive" } },
+              { province: { contains: q, mode: "insensitive" } },
+            ],
+          },
+        },
+      },
+    ];
+  }
   return prisma.customer.findMany({
+    where,
     orderBy: { name: "asc" },
     include: { _count: { select: { addresses: true, pickups: true } } },
   });

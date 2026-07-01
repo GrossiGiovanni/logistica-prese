@@ -22,6 +22,7 @@ import {
   routeTotalVolume,
   routeTotalWeight,
   routeOccupiedMeters,
+  pickupPalletEquivalent,
   getRouteWarnings,
   hasMissingData,
 } from "@/lib/warnings";
@@ -47,11 +48,22 @@ export default async function GiroDettaglioPage({
   if (!route) notFound();
 
   const dateStr = toDateInputValue(route.routeDate);
-  const [unassigned, drivers, vehicles] = await Promise.all([
+  const [unassigned, activeDrivers, activeVehicles] = await Promise.all([
     listUnassignedPickups(dateStr),
     listActiveDrivers(),
     listActiveVehicles(),
   ]);
+
+  // Includi sempre autista/mezzo già assegnati tra le opzioni (anche se inattivi),
+  // così la select non si svuota mai e un salvataggio non azzera l'assegnazione.
+  const drivers =
+    route.driver && !activeDrivers.some((d) => d.id === route.driver!.id)
+      ? [...activeDrivers, route.driver]
+      : activeDrivers;
+  const vehicles =
+    route.vehicle && !activeVehicles.some((v) => v.id === route.vehicle!.id)
+      ? [...activeVehicles, route.vehicle]
+      : activeVehicles;
 
   const totalPallets = routeTotalPallets(route);
   const totalVolume = routeTotalVolume(route);
@@ -163,7 +175,13 @@ export default async function GiroDettaglioPage({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Colonna sinistra: dati giro + fermate */}
         <div className="space-y-6">
-          <RouteForm route={route} drivers={drivers} vehicles={vehicles} defaultDate={dateStr} />
+          <RouteForm
+            key={`${route.id}:${route.driverId ?? ""}:${route.vehicleId ?? ""}`}
+            route={route}
+            drivers={drivers}
+            vehicles={vehicles}
+            defaultDate={dateStr}
+          />
 
           <section>
             <h2 className="mb-2 text-base font-semibold text-slate-900">
@@ -200,7 +218,12 @@ export default async function GiroDettaglioPage({
                       <div className="text-xs text-slate-500">
                         {stop.pickup.address.street}, {stop.pickup.address.city} ({stop.pickup.address.province})
                         {" · "}
-                        {stop.pickup.pallets ?? "—"} pallet · {priorityLabels[stop.pickup.priority]}
+                        {Math.round(pickupPalletEquivalent(stop.pickup))} plt
+                        {stop.pickup.pallets == null && stop.pickup.loadingMeters != null
+                          ? ` (da ${stop.pickup.loadingMeters} mtl)`
+                          : ""}
+                        {" · "}
+                        {priorityLabels[stop.pickup.priority]}
                       </div>
                       {stop.pickup.rawNotes ? (
                         <div className="mt-1 text-xs italic text-slate-400">{stop.pickup.rawNotes}</div>

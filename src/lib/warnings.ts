@@ -148,9 +148,33 @@ type RouteWithRelations = Route & {
   stops: (RouteStop & { pickup: PickupLike })[];
 };
 
-/** Somma dei pallet stimati delle prese del giro. */
+/**
+ * Pallet-equivalenti di una presa: usa i pallet se presenti, altrimenti li ricava
+ * dai metri lineari (MTL × 2,5). Un solo valore, così non c'è doppio conteggio.
+ * Es. 4 MTL → 10 pallet.
+ */
+export function pickupPalletEquivalent(p: {
+  pallets: number | null;
+  loadingMeters: number | null;
+}): number {
+  if (p.pallets != null) return p.pallets;
+  if (p.loadingMeters != null) return p.loadingMeters * PALLETS_PER_METER;
+  return 0;
+}
+
+/** Metri lineari-equivalenti di una presa (dal valore canonico in pallet). */
+export function pickupMetersEquivalent(p: {
+  pallets: number | null;
+  loadingMeters: number | null;
+}): number {
+  return pickupPalletEquivalent(p) * METERS_PER_PALLET;
+}
+
+/** Totale pallet del giro (pallet dichiarati o convertiti dai metri lineari). */
 export function routeTotalPallets(route: RouteWithRelations): number {
-  return route.stops.reduce((sum, stop) => sum + (stop.pickup.pallets ?? 0), 0);
+  return Math.round(
+    route.stops.reduce((sum, stop) => sum + pickupPalletEquivalent(stop.pickup), 0),
+  );
 }
 
 /** Somma dei metri cubi delle prese del giro. */
@@ -169,20 +193,16 @@ export function routeTotalLoadingMeters(route: RouteWithRelations): number {
 }
 
 // Pallet EUR 80×120 cm: in un mezzo largo ~2,4 m stanno 2 pallet affiancati
-// ogni 0,8 m di lunghezza → 0,4 m di carico per pallet.
+// ogni 0,8 m di lunghezza → 0,4 m di carico per pallet (e 2,5 pallet per metro).
 export const METERS_PER_PALLET = 0.4;
+export const PALLETS_PER_METER = 1 / METERS_PER_PALLET; // 2,5
 
 /**
- * Metri occupati sul mezzo dalle prese del giro: usa i metri lineari dichiarati
- * (MTL) se presenti, altrimenti li stima dai pallet (pallet × 0,4 m), arrotondato
- * al metro. Es. 14 pallet × 0,4 = 5,6 → 6 m.
+ * Metri occupati sul mezzo dalle prese del giro (dal valore canonico in pallet),
+ * arrotondato al metro. Es. 14 pallet × 0,4 = 5,6 → 6 m.
  */
 export function routeOccupiedMeters(route: RouteWithRelations): number {
-  const m = route.stops.reduce((sum, stop) => {
-    const p = stop.pickup;
-    const meters = p.loadingMeters ?? (p.pallets != null ? p.pallets * METERS_PER_PALLET : 0);
-    return sum + meters;
-  }, 0);
+  const m = route.stops.reduce((sum, stop) => sum + pickupMetersEquivalent(stop.pickup), 0);
   return Math.round(m);
 }
 
