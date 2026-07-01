@@ -40,16 +40,19 @@ import { formatDateIt, toDateInputValue } from "@/lib/dates";
 
 export default async function GiroDettaglioPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ q?: string }>;
 }) {
   const { id } = await params;
+  const { q } = await searchParams;
   const route = await getRoute(id);
   if (!route) notFound();
 
   const dateStr = toDateInputValue(route.routeDate);
   const [unassigned, activeDrivers, activeVehicles] = await Promise.all([
-    listUnassignedPickups(dateStr),
+    listUnassignedPickups(dateStr, { search: q || undefined }),
     listActiveDrivers(),
     listActiveVehicles(),
   ]);
@@ -268,9 +271,22 @@ export default async function GiroDettaglioPage({
           <h2 className="mb-2 text-base font-semibold text-slate-900">
             Prese non assegnate ({unassigned.length})
           </h2>
+          <form method="get" className="mb-3 flex items-end gap-2">
+            <div className="grow">
+              <input
+                type="text"
+                name="q"
+                defaultValue={q ?? ""}
+                placeholder="Cerca cliente, n. presa, località…"
+                className="field-input"
+              />
+            </div>
+            <button type="submit" className="btn-secondary">Cerca</button>
+            {q ? <a href={`/giri/${route.id}`} className="btn-secondary">Azzera</a> : null}
+          </form>
           {unassigned.length === 0 ? (
             <div className="card px-4 py-6 text-center text-sm text-slate-500">
-              Tutte le prese del giorno sono assegnate.
+              {q ? "Nessuna presa trovata con questa ricerca." : "Tutte le prese del giorno sono assegnate."}
             </div>
           ) : (
             <ul className="space-y-2">
