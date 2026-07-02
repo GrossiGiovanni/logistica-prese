@@ -13,6 +13,8 @@ import {
   routeOccupiedMeters,
   pickupPalletEquivalent,
   pickupMetersEquivalent,
+  pickupFitsShift,
+  hasLoadData,
   routeWarningLabels,
 } from "@/lib/warnings";
 import { WAREHOUSE_COORDS, addressToQuery, fetchRoutePolyline } from "@/lib/distance";
@@ -111,6 +113,10 @@ export default async function PianificazionePlusPage({
       polyline: polylines[i],
       stops: r.stops.map((s) => ({
         seq: s.sequence,
+        warnings: [
+          !pickupFitsShift(s.pickup.timeWindow, r.shift) ? "Fascia diversa dal giro" : null,
+          !hasLoadData(s.pickup) ? "Carico mancante" : null,
+        ].filter((w): w is string => w != null),
         pickup: toPlusPickup(s.pickup, selectedDate),
       })),
     };

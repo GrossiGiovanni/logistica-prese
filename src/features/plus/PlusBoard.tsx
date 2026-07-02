@@ -2,14 +2,14 @@
 
 // Pianificazione Plus: lavagna operativa con mappa.
 // Pannello sinistro = prese non assegnate (con filtri), centro = mappa
-// (magazzino, marker prese, percorsi colorati), destra = giri del giorno.
-// L'assegnazione rapida usa le stesse server action della pianificazione
-// classica (quindi km e stati si aggiornano allo stesso modo).
+// (magazzino, marker prese, percorsi colorati), destra = giri del giorno con
+// fermate espandibili. Si parte "neutri": nessun giro selezionato, l'operatore
+// accende quello che vuole confrontare. Hover su una presa in lista = pin rosso.
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, PolylineF } from "@react-google-maps/api";
-import { assignPickupToRoute } from "@/features/routes/actions";
+import { setPickupRoute } from "@/features/routes/actions";
 import { Badge } from "@/components/badges/Badge";
 
 export type PlusPickup = {
@@ -32,6 +32,12 @@ export type PlusPickup = {
   dateLabel: string;
 };
 
+export type PlusRouteStop = {
+  seq: number;
+  warnings: string[];
+  pickup: PlusPickup;
+};
+
 export type PlusRoute = {
   id: string;
   label: string;
@@ -43,10 +49,11 @@ export type PlusRoute = {
   warnings: string[];
   color: string;
   polyline: string | null;
-  stops: { seq: number; pickup: PlusPickup }[];
+  stops: PlusRouteStop[];
 };
 
 const CONTAINER_STYLE = { width: "100%", height: "100%" };
+const HOVER_COLOR = "#ef4444";
 
 /** Decodifica una polyline Google (algoritmo standard). */
 function decodePolyline(encoded: string): { lat: number; lng: number }[] {
@@ -108,12 +115,11 @@ export function PlusBoard({
   const [onlyBacklog, setOnlyBacklog] = useState(false);
   const [onlyUrgent, setOnlyUrgent] = useState(false);
   const [onlyMotrice, setOnlyMotrice] = useState(false);
-  // Giri visibili sulla mappa (default: tutti)
-  const [visibleRoutes, setVisibleRoutes] = useState<Set<string>>(
-    () => new Set(routes.map((r) => r.id)),
-  );
-  // Presa selezionata (dettaglio / info window). routeId per le prese assegnate.
+  // Stato iniziale neutro: NESSUN giro selezionato, l'operatore sceglie cosa vedere.
+  const [visibleRoutes, setVisibleRoutes] = useState<Set<string>>(() => new Set());
+  // Presa selezionata (dettaglio) e presa in hover (pin rosso sulla mappa).
   const [selected, setSelected] = useState<{ pickup: PlusPickup; routeId?: string } | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   const filteredUnassigned = useMemo(
     () =>
@@ -139,6 +145,13 @@ export function PlusBoard({
   const redirectTo = `/pianificazione-plus?date=${date}`;
   const selectedRoute = selected?.routeId ? routes.find((r) => r.id === selected.routeId) : undefined;
 
+  // Icona marker: hover vince su tutto (rosso, grande).
+  function markerIcon(pickupId: string, baseColor: string, baseScale: number) {
+    if (hoveredId === pickupId) return circleIcon(HOVER_COLOR, 13);
+    if (selected?.pickup.id === pickupId) return circleIcon(baseColor, baseScale + 3);
+    return circleIcon(baseColor, baseScale);
+  }
+
   const detail = selected ? (
     <div className="space-y-1 text-xs">
       <div className="flex items-center gap-2">
@@ -158,32 +171,44 @@ export function PlusBoard({
         {selected.pickup.isBacklog ? " · DA RECUPERARE" : ""}
       </div>
       {selected.pickup.notes ? <div className="italic text-slate-500">{selected.pickup.notes}</div> : null}
+
       {selectedRoute ? (
         <div className="pt-1">
-          <span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: selectedRoute.color }} />
+          <span
+            className="mr-1 inline-block h-2 w-2 rounded-full"
+            style={{ backgroundColor: selectedRoute.color }}
+          />
           Giro: <b>{selectedRoute.label}</b>{" "}
           <Link href={`/giri/${selectedRoute.id}`} className="text-brand-700 hover:underline">Apri →</Link>
         </div>
-      ) : routes.length > 0 ? (
-        <form action={assignPickupToRoute} className="flex items-center gap-1 pt-1">
-          <input type="hidden" name="pickupId" value={selected.pickup.id} />
-          <input type="hidden" name="redirectTo" value={redirectTo} />
-          <select name="routeId" required defaultValue="" className="field-input w-auto grow py-1 text-xs">
-            <option value="" disabled>Assegna al giro…</option>
-            {routes.map((r) => (
-              <option key={r.id} value={r.id}>{r.label} · {r.shiftLabel}</option>
-            ))}
-          </select>
-          <button type="submit" className="btn-primary px-2 py-1 text-xs">OK</button>
-        </form>
-      ) : (
-        <div className="text-slate-400">Nessun giro per questa data: creane uno per assegnare.</div>
-      )}
+      ) : null}
+
+      {/* Assegnazione: un solo menu con "Da assegnare" sempre presente.
+          Si applica al cambio e si chiude subito (niente stati bloccati). */}
+      <form action={setPickupRoute} className="pt-1">
+        <input type="hidden" name="pickupId" value={selected.pickup.id} />
+        <input type="hidden" name="redirectTo" value={redirectTo} />
+        <select
+          name="routeId"
+          defaultValue={selected.routeId ?? ""}
+          onChange={(e) => {
+            e.currentTarget.form?.requestSubmit();
+            setSelected(null); // chiude menu e dettaglio; la pagina si ricarica coi dati freschi
+          }}
+          className="field-input w-full py-1 text-xs"
+          title="Sposta la presa su un giro o riportala tra le non assegnate"
+        >
+          <option value="">— Da assegnare —</option>
+          {routes.map((r) => (
+            <option key={r.id} value={r.id}>{r.label} · {r.shiftLabel}</option>
+          ))}
+        </select>
+      </form>
     </div>
   ) : null;
 
   return (
-    <div className="grid grid-cols-1 gap-3 xl:grid-cols-[280px_1fr_320px]" style={{ minHeight: 560 }}>
+    <div className="grid grid-cols-1 gap-3 xl:grid-cols-[280px_1fr_340px]" style={{ minHeight: 560 }}>
       {/* SINISTRA: prese non assegnate */}
       <div className="flex max-h-[75vh] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
         <div className="border-b border-slate-200 p-2">
@@ -216,8 +241,10 @@ export function PlusBoard({
               <li key={p.id}>
                 <button
                   onClick={() => setSelected({ pickup: p })}
+                  onMouseEnter={() => setHoveredId(p.id)}
+                  onMouseLeave={() => setHoveredId(null)}
                   className={
-                    "w-full px-3 py-2 text-left text-xs hover:bg-slate-50 " +
+                    "w-full px-3 py-2 text-left text-xs hover:bg-red-50 " +
                     (selected?.pickup.id === p.id ? "bg-brand-50" : "")
                   }
                 >
@@ -259,7 +286,7 @@ export function PlusBoard({
               zIndex={1000}
             />
 
-            {/* Prese non assegnate (grigie) */}
+            {/* Prese non assegnate (grigie; rosse se in hover) */}
             {showUnassigned
               ? filteredUnassigned
                   .filter((p) => p.lat != null && p.lng != null)
@@ -268,13 +295,14 @@ export function PlusBoard({
                       key={p.id}
                       position={{ lat: p.lat!, lng: p.lng! }}
                       title={p.customer}
-                      icon={circleIcon(p.isBacklog ? "#dc2626" : "#94a3b8", selected?.pickup.id === p.id ? 11 : 8)}
+                      icon={markerIcon(p.id, p.isBacklog ? "#b91c1c" : "#94a3b8", 8)}
+                      zIndex={hoveredId === p.id ? 999 : undefined}
                       onClick={() => setSelected({ pickup: p })}
                     />
                   ))
               : null}
 
-            {/* Fermate dei giri visibili (numerate, colorate per giro) */}
+            {/* Fermate dei giri selezionati (numerate, colorate per giro) */}
             {routes
               .filter((r) => visibleRoutes.has(r.id))
               .map((r) =>
@@ -286,13 +314,14 @@ export function PlusBoard({
                       position={{ lat: s.pickup.lat!, lng: s.pickup.lng! }}
                       title={`${s.seq}. ${s.pickup.customer} (${r.label})`}
                       label={{ text: String(s.seq), color: "#ffffff", fontSize: "10px", fontWeight: "bold" }}
-                      icon={circleIcon(r.color, selected?.pickup.id === s.pickup.id ? 12 : 10)}
+                      icon={markerIcon(s.pickup.id, r.color, 10)}
+                      zIndex={hoveredId === s.pickup.id ? 999 : undefined}
                       onClick={() => setSelected({ pickup: s.pickup, routeId: r.id })}
                     />
                   )),
               )}
 
-            {/* Percorsi dei giri visibili */}
+            {/* Percorsi dei giri selezionati */}
             {routes
               .filter((r) => visibleRoutes.has(r.id) && r.polyline)
               .map((r) => (
@@ -316,10 +345,11 @@ export function PlusBoard({
         )}
       </div>
 
-      {/* DESTRA: giri del giorno */}
+      {/* DESTRA: giri del giorno con fermate */}
       <div className="flex max-h-[75vh] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
         <div className="border-b border-slate-200 p-2 text-sm font-semibold text-slate-900">
           Giri del giorno ({routes.length})
+          <span className="ml-1 font-normal text-xs text-slate-400">— spunta per vedere su mappa</span>
         </div>
         <ul className="flex-1 divide-y divide-slate-100 overflow-y-auto">
           {routes.length === 0 ? (
@@ -356,6 +386,48 @@ export function PlusBoard({
                     ) : null}
                   </span>
                 </label>
+
+                {/* Fermate del giro (visibili quando il giro è selezionato) */}
+                {visibleRoutes.has(r.id) && r.stops.length > 0 ? (
+                  <ol className="mt-2 space-y-1 border-l-2 pl-2" style={{ borderColor: r.color }}>
+                    {r.stops.map((s) => (
+                      <li key={s.pickup.id}>
+                        <button
+                          onClick={() => setSelected({ pickup: s.pickup, routeId: r.id })}
+                          onMouseEnter={() => setHoveredId(s.pickup.id)}
+                          onMouseLeave={() => setHoveredId(null)}
+                          className={
+                            "w-full rounded px-1.5 py-1 text-left hover:bg-red-50 " +
+                            (selected?.pickup.id === s.pickup.id ? "bg-brand-50" : "")
+                          }
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span
+                              className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                              style={{ backgroundColor: r.color }}
+                            >
+                              {s.seq}
+                            </span>
+                            {s.pickup.numero ? (
+                              <span className="font-mono text-[10px] font-semibold text-brand-700">{s.pickup.numero}</span>
+                            ) : null}
+                            <span className="truncate font-medium text-slate-800">{s.pickup.customer}</span>
+                          </span>
+                          <span className="block pl-5 text-slate-500">
+                            {s.pickup.address} · {s.pickup.palletEq} plt / {s.pickup.metersEq} m · {s.pickup.timeLabel}
+                          </span>
+                          {s.warnings.length > 0 ? (
+                            <span className="flex flex-wrap gap-1 pl-5 pt-0.5">
+                              {s.warnings.map((w) => (
+                                <Badge key={w} tone="amber">{w}</Badge>
+                              ))}
+                            </span>
+                          ) : null}
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                ) : null}
               </li>
             ))
           )}

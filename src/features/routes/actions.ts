@@ -194,6 +194,68 @@ export async function assignPickupToRoute(formData: FormData): Promise<void> {
   redirect(redirectTo);
 }
 
+/**
+ * Imposta il giro di una presa in un colpo solo (per Pianificazione Plus):
+ * routeId valorizzato → sposta/assegna la presa a quel giro;
+ * routeId vuoto → la presa torna "da assegnare".
+ * Ricalcola i km di tutti i giri coinvolti.
+ */
+export async function setPickupRoute(formData: FormData): Promise<void> {
+  const pickupId = formData.get("pickupId") as string;
+  const routeId = ((formData.get("routeId") as string) || "").trim();
+  const redirectTo = (formData.get("redirectTo") as string) || "/pianificazione-plus";
+  if (!pickupId) return;
+
+  const existing = await prisma.routeStop.findMany({
+    where: { pickupId },
+    select: { routeId: true },
+  });
+  const oldRouteIds = [...new Set(existing.map((s) => s.routeId))].filter((id) => id !== routeId);
+
+  // Rimuove la presa dagli altri giri.
+  if (oldRouteIds.length > 0) {
+    await prisma.routeStop.deleteMany({
+      where: { pickupId, routeId: { in: oldRouteIds } },
+    });
+  }
+
+  if (routeId) {
+    const alreadyThere = existing.some((s) => s.routeId === routeId);
+    if (!alreadyThere) {
+      const last = await prisma.routeStop.findFirst({
+        where: { routeId },
+        orderBy: { sequence: "desc" },
+        select: { sequence: true },
+      });
+      await prisma.$transaction([
+        prisma.routeStop.create({
+          data: { routeId, pickupId, sequence: (last?.sequence ?? 0) + 1 },
+        }),
+        prisma.pickup.update({ where: { id: pickupId }, data: { status: "PLANNED" } }),
+      ]);
+    }
+    await recalcRouteKm(routeId);
+  } else {
+    const pickup = await prisma.pickup.findUnique({
+      where: { id: pickupId },
+      select: { pallets: true, loadingMeters: true, volumeM3: true, status: true },
+    });
+    if (pickup && pickup.status === "PLANNED") {
+      await prisma.pickup.update({
+        where: { id: pickupId },
+        data: { status: unplannedStatus(pickup) },
+      });
+    }
+  }
+
+  for (const old of oldRouteIds) {
+    await recalcRouteKm(old);
+  }
+
+  revalidateRoutes(routeId || undefined);
+  redirect(redirectTo);
+}
+
 /** Rimuove una presa da un giro; se non è in altri giri, torna disponibile. */
 export async function removePickupFromRoute(formData: FormData): Promise<void> {
   const routeId = formData.get("routeId") as string;
