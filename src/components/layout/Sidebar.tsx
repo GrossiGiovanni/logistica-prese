@@ -8,6 +8,7 @@ const nav = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/pianificazione", label: "Pianificazione" },
   { href: "/prese", label: "Prese" },
+  { href: "/importa", label: "Importa AS400" },
   { href: "/prese-fisse", label: "Prese fisse" },
   { href: "/giri", label: "Giri" },
   { href: "/clienti", label: "Clienti" },

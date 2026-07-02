@@ -248,6 +248,19 @@ model Route {
   @@index([status])
 }
 
+model ImportLog {
+  id           String   @id @default(cuid())
+  fileName     String
+  totalRows    Int
+  imported     Int
+  skipped      Int
+  errors       Int
+  errorDetails String? // dettagli righe scartate (testo)
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 model RouteStop {
   id        String   @id @default(cuid())
   routeId   String

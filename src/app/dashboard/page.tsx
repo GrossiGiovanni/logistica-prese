@@ -35,6 +35,9 @@ export default async function DashboardPage({
         description={`Riepilogo operativo del ${formatDateIt(parseDateOnly(selectedDate))}`}
       >
         <DateSelector value={selectedDate} label="Giorno" />
+        <Link href="/importa" className="btn-secondary">
+          Importa prese da AS400
+        </Link>
         <Link href={`/pianificazione?date=${selectedDate}`} className="btn-primary">
           Vai alla pianificazione
         </Link>
