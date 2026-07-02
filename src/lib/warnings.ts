@@ -43,7 +43,7 @@ export function shiftsOverlap(a: RouteShift, b: RouteShift): boolean {
 }
 
 export const pickupWarningLabels: Record<PickupWarning, string> = {
-  missing_pallets: "Pallet mancanti",
+  missing_pallets: "Carico mancante",
   missing_notes: "Note mancanti",
   high_priority: "Priorità alta",
   requires_motrice: "Richiede motrice",
@@ -97,35 +97,26 @@ type PickupLike = Pick<
   | "requiresTailLift"
 >;
 
+/** True se la presa ha un dato di carico utilizzabile (pallet, metri lineari o m³). */
+export function hasLoadData(pickup: Pick<Pickup, "pallets" | "loadingMeters" | "volumeM3">): boolean {
+  return pickup.pallets != null || pickup.loadingMeters != null || pickup.volumeM3 != null;
+}
+
 /**
- * Una presa è "con dati mancanti" se:
- * - non ha pallets; oppure
- * - non ha addressId; oppure
- * - non ha timeWindow; oppure
- * - ha rawNotes vuote e nessun altro dato operativo utile.
+ * Una presa è "con dati mancanti" se non ha indirizzo, fascia o alcun dato di
+ * carico (pallet, MTL e m³ sono equivalenti tra loro: ne basta uno).
  */
 export function hasMissingData(pickup: PickupLike): boolean {
-  if (pickup.pallets == null) return true;
   if (!pickup.addressId) return true;
   if (!pickup.timeWindow) return true;
-
-  const hasRawNotes = Boolean(pickup.rawNotes && pickup.rawNotes.trim().length > 0);
-  const hasOperationalData =
-    pickup.pallets != null ||
-    pickup.colli != null ||
-    pickup.weightKg != null ||
-    pickup.volumeM3 != null;
-
-  if (!hasRawNotes && !hasOperationalData) return true;
-
-  return false;
+  return !hasLoadData(pickup);
 }
 
 /** Lista dei warning applicabili a una presa. */
 export function getPickupWarnings(pickup: PickupLike): PickupWarning[] {
   const warnings: PickupWarning[] = [];
 
-  if (pickup.pallets == null) warnings.push("missing_pallets");
+  if (!hasLoadData(pickup)) warnings.push("missing_pallets");
 
   const hasRawNotes = Boolean(pickup.rawNotes && pickup.rawNotes.trim().length > 0);
   const hasInternalNotes = Boolean(

@@ -46,9 +46,18 @@ export async function recalcRouteKm(routeId: string): Promise<void> {
   }
 }
 
-/** Stato a cui torna una presa rimossa da un giro, in base ai dati. */
-function unplannedStatus(pallets: number | null): "READY" | "DRAFT" {
-  return pallets != null ? "READY" : "DRAFT";
+/**
+ * Stato a cui torna una presa rimossa da un giro: READY se ha un dato di carico
+ * (pallet, metri lineari o m³), altrimenti DRAFT.
+ */
+function unplannedStatus(p: {
+  pallets: number | null;
+  loadingMeters: number | null;
+  volumeM3: number | null;
+}): "READY" | "DRAFT" {
+  return p.pallets != null || p.loadingMeters != null || p.volumeM3 != null
+    ? "READY"
+    : "DRAFT";
 }
 
 /** Crea un nuovo giro e reindirizza al suo dettaglio. */
@@ -134,7 +143,11 @@ export async function deleteRoute(formData: FormData): Promise<void> {
 
   const stops = await prisma.routeStop.findMany({
     where: { routeId: id },
-    include: { pickup: { select: { id: true, pallets: true, status: true } } },
+    include: {
+      pickup: {
+        select: { id: true, pallets: true, loadingMeters: true, volumeM3: true, status: true },
+      },
+    },
   });
 
   await prisma.$transaction([
@@ -144,7 +157,7 @@ export async function deleteRoute(formData: FormData): Promise<void> {
       .map((s) =>
         prisma.pickup.update({
           where: { id: s.pickup.id },
-          data: { status: unplannedStatus(s.pickup.pallets) },
+          data: { status: unplannedStatus(s.pickup) },
         }),
       ),
   ]);
@@ -195,12 +208,12 @@ export async function removePickupFromRoute(formData: FormData): Promise<void> {
   if (stillAssigned === 0) {
     const pickup = await prisma.pickup.findUnique({
       where: { id: pickupId },
-      select: { pallets: true, status: true },
+      select: { pallets: true, loadingMeters: true, volumeM3: true, status: true },
     });
     if (pickup && pickup.status === "PLANNED") {
       await prisma.pickup.update({
         where: { id: pickupId },
-        data: { status: unplannedStatus(pickup.pallets) },
+        data: { status: unplannedStatus(pickup) },
       });
     }
   }

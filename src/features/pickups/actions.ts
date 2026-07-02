@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { geocodeAddress } from "@/lib/geocode";
+import { recalcRouteKm } from "@/features/routes/actions";
 import { pickupSchema, parseForm, type ActionResult } from "@/lib/validations";
 import { parseDateOnly } from "@/lib/dates";
 
@@ -90,9 +91,20 @@ export async function cancelPickup(formData: FormData): Promise<void> {
   const id = formData.get("id") as string;
   if (!id) return;
 
+  // Giri da cui la presa viene rimossa: i loro km vanno ricalcolati.
+  const stops = await prisma.routeStop.findMany({
+    where: { pickupId: id },
+    select: { routeId: true },
+  });
+
   await prisma.pickup.update({ where: { id }, data: { status: "CANCELLED" } });
   // Rimuove la presa da eventuali giri.
   await prisma.routeStop.deleteMany({ where: { pickupId: id } });
+
+  for (const routeId of new Set(stops.map((s) => s.routeId))) {
+    await recalcRouteKm(routeId);
+    revalidatePath(`/giri/${routeId}`);
+  }
 
   revalidatePath("/prese");
   revalidatePath("/pianificazione");
