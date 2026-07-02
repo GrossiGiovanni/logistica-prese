@@ -4,7 +4,9 @@ import { parseDateOnly } from "@/lib/dates";
 
 export const pickupInclude = {
   customer: { select: { id: true, name: true } },
-  address: { select: { id: true, label: true, street: true, city: true, province: true } },
+  address: {
+    select: { id: true, label: true, street: true, city: true, province: true, lat: true, lng: true },
+  },
   routeStops: {
     select: {
       routeId: true,

@@ -14,7 +14,6 @@ export type RouteWarning =
   | "vehicle_missing"
   | "driver_missing"
   | "capacity_exceeded"
-  | "expensive_vehicle_used"
   | "contains_unvalidated_pickups"
   | "pickup_shift_mismatch"
   | "vehicle_unavailable"
@@ -54,7 +53,6 @@ export const routeWarningLabels: Record<RouteWarning, string> = {
   vehicle_missing: "Mezzo mancante",
   driver_missing: "Autista mancante",
   capacity_exceeded: "Capacità superata",
-  expensive_vehicle_used: "Mezzo costoso (motrice)",
   contains_unvalidated_pickups: "Prese con dati mancanti",
   pickup_shift_mismatch: "Presa in fascia diversa dal giro",
   vehicle_unavailable: "Mezzo non disponibile in questa fascia",
@@ -74,7 +72,6 @@ export const routeWarningTone: Record<RouteWarning, "red" | "amber" | "blue"> = 
   vehicle_missing: "amber",
   driver_missing: "amber",
   capacity_exceeded: "red",
-  expensive_vehicle_used: "blue",
   contains_unvalidated_pickups: "amber",
   pickup_shift_mismatch: "red",
   vehicle_unavailable: "red",
@@ -218,13 +215,6 @@ export function getRouteWarnings(route: RouteWithRelations): RouteWarning[] {
     v?.capacityWeightKg != null && routeTotalWeight(route) > v.capacityWeightKg;
   if (overPallets || overVolume || overWeight) {
     warnings.push("capacity_exceeded");
-  }
-
-  if (
-    route.vehicle?.vehicleType === "MOTRICE" ||
-    route.vehicle?.costLevel === "HIGH"
-  ) {
-    warnings.push("expensive_vehicle_used");
   }
 
   // Mezzo non disponibile nella fascia del giro.

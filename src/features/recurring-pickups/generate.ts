@@ -1,6 +1,6 @@
 // Modulo server-only: usa prisma, va importato solo lato server.
 import { prisma } from "@/lib/db";
-import { parseDateOnly, weekdayKey, yesterdayInputValue } from "@/lib/dates";
+import { parseDateOnly, weekdayKey, yesterdayInputValue, todayInputValue, addDaysInput } from "@/lib/dates";
 
 export type GenerateResult = { created: number; skipped: number };
 
@@ -10,8 +10,10 @@ export type GenerateResult = { created: number; skipped: number };
  * così le ricorrenze con giorni+quantità compaiono senza un click manuale.
  */
 export async function ensureRecurringForDate(dateStr: string): Promise<void> {
-  // Finestra operativa: dal giorno prima in poi (non backfilla lo storico più vecchio).
+  // Finestra operativa: da ieri a +7 giorni. Evita che la semplice navigazione
+  // su date lontane nel futuro crei prese fisse per quelle date.
   if (dateStr < yesterdayInputValue()) return;
+  if (dateStr > addDaysInput(todayInputValue(), 7)) return;
   await generateRecurringPickups(dateStr);
 }
 

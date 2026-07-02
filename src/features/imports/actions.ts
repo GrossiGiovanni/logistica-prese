@@ -89,6 +89,12 @@ export async function previewImport(formData: FormData): Promise<ImportPreview> 
   };
 }
 
+/** Svuota lo storico degli import (solo il log: le prese importate restano). */
+export async function clearImportLogs(): Promise<void> {
+  await prisma.importLog.deleteMany();
+  revalidatePath("/importa");
+}
+
 export type ImportResult = {
   ok: boolean;
   error?: string;

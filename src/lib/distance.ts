@@ -6,6 +6,8 @@
 
 // Indirizzo del magazzino (partenza/arrivo di ogni giro). Modificabile qui.
 export const WAREHOUSE_ADDRESS = "Via Ticino 33, 20098 San Giuliano Milanese MI, Italia";
+// Coordinate del magazzino (geocodificate una tantum dall'indirizzo sopra).
+export const WAREHOUSE_COORDS = { lat: 45.3839047, lng: 9.2535401 };
 
 type AddressParts = {
   street: string;
@@ -68,5 +70,36 @@ export async function computeRouteKm(stopAddresses: string[]): Promise<RouteKmRe
   } catch (err) {
     console.warn("[distance] errore di rete:", err);
     return { km: null, reason: "api_error" };
+  }
+}
+
+/**
+ * Polyline (codificata) del percorso magazzino → fermate → magazzino, per il
+ * disegno del giro su mappa. Best-effort: null se chiave assente o errore.
+ */
+export async function fetchRoutePolyline(stopAddresses: string[]): Promise<string | null> {
+  if (stopAddresses.length === 0) return null;
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) return null;
+
+  const url = new URL("https://maps.googleapis.com/maps/api/directions/json");
+  url.searchParams.set("origin", WAREHOUSE_ADDRESS);
+  url.searchParams.set("destination", WAREHOUSE_ADDRESS);
+  url.searchParams.set("waypoints", stopAddresses.join("|"));
+  url.searchParams.set("mode", "driving");
+  url.searchParams.set("region", "it");
+  url.searchParams.set("key", apiKey);
+
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      status: string;
+      routes?: { overview_polyline?: { points?: string } }[];
+    };
+    if (data.status !== "OK") return null;
+    return data.routes?.[0]?.overview_polyline?.points ?? null;
+  } catch {
+    return null;
   }
 }

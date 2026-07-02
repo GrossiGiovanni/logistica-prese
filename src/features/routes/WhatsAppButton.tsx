@@ -10,7 +10,6 @@ export function WhatsAppButton({
   routeId,
   digits,
   message,
-  compact = false,
 }: {
   routeId: string;
   digits: string;
@@ -32,12 +31,10 @@ export function WhatsAppButton({
       target="_blank"
       rel="noopener noreferrer"
       onClick={onOpen}
-      className={
-        "inline-flex items-center gap-1 rounded-md bg-[#25D366] font-medium text-white hover:bg-[#1ebe5b] " +
-        (compact ? "px-2 py-1 text-xs" : "px-3 py-2 text-sm")
-      }
+      title="Invia il giro all'autista su WhatsApp"
+      className="inline-flex items-center gap-1 rounded-md bg-[#25D366] px-2 py-1 text-xs font-medium text-white hover:bg-[#1ebe5b]"
     >
-      Invia giro su WhatsApp
+      WhatsApp
     </a>
   );
 }

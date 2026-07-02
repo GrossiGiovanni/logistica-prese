@@ -7,6 +7,7 @@ import { signOut } from "@/features/auth/actions";
 const nav = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/pianificazione", label: "Pianificazione" },
+  { href: "/pianificazione-plus", label: "Pianificazione Plus" },
   { href: "/prese", label: "Prese" },
   { href: "/importa", label: "Importa Prese" },
   { href: "/prese-fisse", label: "Prese fisse" },

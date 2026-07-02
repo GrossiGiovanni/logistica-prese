@@ -52,6 +52,11 @@ export async function geocodeAddress(a: AddressParts): Promise<GeocodeResult | n
     };
 
     if (data.status !== "OK" || !data.results?.length) {
+      // Geocoding API non attivata sul progetto: ripiega sulla Directions API
+      // (attiva), che geocodifica internamente origine/destinazione.
+      if (data.status === "REQUEST_DENIED") {
+        return geocodeViaDirections(query, key);
+      }
       if (data.status !== "ZERO_RESULTS") {
         console.warn(`[geocode] status=${data.status} ${data.error_message ?? ""} per "${query}"`);
       }
@@ -63,6 +68,35 @@ export async function geocodeAddress(a: AddressParts): Promise<GeocodeResult | n
     return { lat: loc.lat, lng: loc.lng };
   } catch (err) {
     console.warn(`[geocode] errore di rete per "${query}":`, err);
+    return null;
+  }
+}
+
+/**
+ * Fallback: ricava le coordinate da una richiesta Directions con origine =
+ * destinazione = indirizzo (il leg riporta la posizione geocodificata).
+ */
+async function geocodeViaDirections(query: string, key: string): Promise<GeocodeResult | null> {
+  try {
+    const url = new URL("https://maps.googleapis.com/maps/api/directions/json");
+    url.searchParams.set("origin", query);
+    url.searchParams.set("destination", query);
+    url.searchParams.set("region", "it");
+    url.searchParams.set("key", key);
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      status: string;
+      routes?: { legs?: { start_location?: { lat: number; lng: number } }[] }[];
+      error_message?: string;
+    };
+    const loc = data.routes?.[0]?.legs?.[0]?.start_location;
+    if (data.status !== "OK" || !loc) {
+      console.warn(`[geocode/directions] status=${data.status} ${data.error_message ?? ""} per "${query}"`);
+      return null;
+    }
+    return { lat: loc.lat, lng: loc.lng };
+  } catch {
     return null;
   }
 }
