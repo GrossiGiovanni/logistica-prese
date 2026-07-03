@@ -9,12 +9,14 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Blu istituzionale Eurosarda (dal logo)
         brand: {
-          50: "#eef6ff",
-          100: "#d9eaff",
-          500: "#2563eb",
-          600: "#1d4ed8",
-          700: "#1e40af",
+          50: "#eef0fa",
+          100: "#dce1f5",
+          200: "#b9c3ea",
+          500: "#3d4fae",
+          600: "#2b3990",
+          700: "#222d73",
         },
       },
     },

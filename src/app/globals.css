@@ -7,7 +7,10 @@
 }
 
 body {
-  @apply bg-slate-100 text-slate-900 antialiased;
+  @apply text-slate-900 antialiased;
+  background-color: #f3f5fb; /* grigio-azzurro caldo in tinta col blu Eurosarda */
+  background-image: linear-gradient(180deg, #eef0fa 0%, #f3f5fb 240px);
+  background-repeat: no-repeat;
 }
 
 /* Stili base per input/select riutilizzabili nelle form */
@@ -41,6 +44,6 @@ body {
   }
 
   .card {
-    @apply rounded-lg border border-slate-200 bg-white shadow-sm;
+    @apply rounded-xl border border-slate-200 bg-white shadow-sm;
   }
 }

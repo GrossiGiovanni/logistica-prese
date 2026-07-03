@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "@/features/auth/actions";
+import { Logo } from "./Logo";
 
 type NavLink = { href: string; label: string };
 type NavItem = NavLink | { label: string; children: NavLink[] };
@@ -84,11 +85,11 @@ export function Sidebar({ userEmail }: { userEmail?: string }) {
 
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-slate-200 bg-white">
-      <div className="border-b border-slate-200 px-4 py-4">
-        <div className="text-sm font-bold uppercase tracking-wide text-brand-700">
-          Logistica Prese
+      <div className="border-b border-slate-200 px-4 pb-3 pt-4">
+        <Logo className="w-full" />
+        <div className="mt-1 text-center text-[11px] font-medium uppercase tracking-widest text-slate-400">
+          Pianificazione ritiri
         </div>
-        <div className="text-xs text-slate-500">Pianificazione ritiri</div>
       </div>
       <nav className="flex-1 space-y-1 p-2">
         {nav.map((item) =>
