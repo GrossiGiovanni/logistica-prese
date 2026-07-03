@@ -23,6 +23,7 @@ export async function applyPreseFilters(formData: FormData): Promise<void> {
     sourceType: str(formData, "sourceType"),
     timeWindow: str(formData, "timeWindow"),
     search: str(formData, "search"),
+    unassigned: str(formData, "unassigned"),
   };
   const c = await cookies();
   if (Object.values(state).some(Boolean)) {

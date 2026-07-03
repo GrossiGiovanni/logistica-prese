@@ -86,22 +86,34 @@ export async function setPickupTimeWindow(formData: FormData): Promise<void> {
   redirect(redirectTo);
 }
 
-/** Annulla logicamente una presa (status = CANCELLED). */
+/**
+ * Annulla una presa: eliminazione DEFINITIVA (sparisce da liste, pianificazione,
+ * dashboard e mappa; se serve di nuovo va ricreata o reimportata).
+ * Eccezione tecnica: le prese generate da una ricorrenza vengono marcate
+ * CANCELLED (invisibili ovunque) invece di essere cancellate, così la presa
+ * fissa non viene rigenerata automaticamente per quella stessa data.
+ */
 export async function cancelPickup(formData: FormData): Promise<void> {
   const id = formData.get("id") as string;
   if (!id) return;
 
-  // Giri da cui la presa viene rimossa: i loro km vanno ricalcolati.
-  const stops = await prisma.routeStop.findMany({
-    where: { pickupId: id },
-    select: { routeId: true },
+  const pickup = await prisma.pickup.findUnique({
+    where: { id },
+    select: { recurringPickupId: true, routeStops: { select: { routeId: true } } },
   });
+  if (!pickup) return;
+  const routeIds = new Set(pickup.routeStops.map((s) => s.routeId));
 
-  await prisma.pickup.update({ where: { id }, data: { status: "CANCELLED" } });
-  // Rimuove la presa da eventuali giri.
-  await prisma.routeStop.deleteMany({ where: { pickupId: id } });
+  if (pickup.recurringPickupId) {
+    // Da ricorrenza: resta come blocco anti-rigenerazione, ma invisibile.
+    await prisma.routeStop.deleteMany({ where: { pickupId: id } });
+    await prisma.pickup.update({ where: { id }, data: { status: "CANCELLED" } });
+  } else {
+    // Spot/import: eliminazione definitiva (cascade rimuove le fermate).
+    await prisma.pickup.delete({ where: { id } });
+  }
 
-  for (const routeId of new Set(stops.map((s) => s.routeId))) {
+  for (const routeId of routeIds) {
     await recalcRouteKm(routeId);
     revalidatePath(`/giri/${routeId}`);
   }

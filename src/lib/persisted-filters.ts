@@ -19,6 +19,7 @@ export type PreseFilterState = {
   sourceType?: string;
   timeWindow?: string;
   search?: string;
+  unassigned?: string; // "1" = solo prese non assegnate ad alcun giro
 };
 
 export async function getPreseFilters(): Promise<PreseFilterState> {

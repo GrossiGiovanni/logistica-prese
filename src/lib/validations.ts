@@ -35,6 +35,13 @@ const optionalFloat = z.preprocess((v) => {
   return Number.isNaN(n) ? v : n;
 }, z.number().nonnegative().optional());
 
+/** "" -> undefined, altrimenti numero (anche negativo, virgola ammessa) — per coordinate. */
+const optionalCoord = z.preprocess((v) => {
+  if (v == null || v === "") return undefined;
+  const n = Number(String(v).replace(",", "."));
+  return Number.isNaN(n) ? v : n;
+}, z.number().optional());
+
 /** Checkbox HTML: "on" / "true" / true -> true, resto -> false. */
 const checkbox = z.preprocess(
   (v) => v === "on" || v === "true" || v === true,
@@ -86,6 +93,8 @@ export const addressSchema = z.object({
     (v) => (typeof v === "string" && v.trim() ? v.trim() : "IT"),
     z.string(),
   ),
+  lat: optionalCoord,
+  lng: optionalCoord,
   notes: optionalString,
 });
 export type AddressInput = z.infer<typeof addressSchema>;

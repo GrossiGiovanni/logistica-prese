@@ -16,6 +16,7 @@ export function PickupFiltersBar({
     sourceType?: string;
     timeWindow?: string;
     search?: string;
+    unassigned?: boolean;
   };
 }) {
   return (
@@ -28,10 +29,18 @@ export function PickupFiltersBar({
         <label className="field-label">Stato</label>
         <select name="status" defaultValue={current.status ?? ""} className="field-input w-auto">
           <option value="">Tutti</option>
-          {toOptions(pickupStatusLabels).map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
+          {toOptions(pickupStatusLabels)
+            .filter((o) => o.value !== "CANCELLED")
+            .map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
         </select>
+      </div>
+      <div className="pb-2">
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" name="unassigned" value="1" defaultChecked={current.unassigned ?? false} />
+          Solo da assegnare
+        </label>
       </div>
       <div>
         <label className="field-label">Origine</label>

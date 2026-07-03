@@ -34,11 +34,12 @@ export default async function PresePage({
     sourceType: (saved.sourceType as PickupSourceType) || undefined,
     timeWindow: (saved.timeWindow as TimeWindow) || undefined,
     search: saved.search || undefined,
+    unassignedOnly: saved.unassigned === "1",
   };
   const pickups = await listPickups(filters);
 
   // Stato per la barra filtri: mostra sempre la data corrente.
-  const barCurrent = { ...filters, date: viewDate };
+  const barCurrent = { ...filters, date: viewDate, unassigned: filters.unassignedOnly };
   const prevDate = addDaysInput(viewDate, -1);
   const nextDate = addDaysInput(viewDate, 1);
 
@@ -120,12 +121,15 @@ export default async function PresePage({
       cell: (p) => (
         <div className="flex justify-end gap-2">
           <Link href={`/prese/${p.id}/modifica`} className="btn-secondary">Modifica</Link>
-          {p.status !== "CANCELLED" ? (
-            <form action={cancelPickup}>
-              <input type="hidden" name="id" value={p.id} />
-              <ConfirmButton variant="danger" confirm="Annullare questa presa?">Annulla</ConfirmButton>
-            </form>
-          ) : null}
+          <form action={cancelPickup}>
+            <input type="hidden" name="id" value={p.id} />
+            <ConfirmButton
+              variant="danger"
+              confirm="Eliminare definitivamente questa presa? Se servirà di nuovo andrà ricreata o reimportata."
+            >
+              Annulla
+            </ConfirmButton>
+          </form>
         </div>
       ),
     },

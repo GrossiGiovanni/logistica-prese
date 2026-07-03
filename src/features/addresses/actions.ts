@@ -14,29 +14,22 @@ export async function upsertAddress(
   const parsed = parseForm(addressSchema, formData);
   if (!parsed.success) return parsed.result;
 
-  const data = parsed.data;
+  const { lat: manualLat, lng: manualLng, ...data } = parsed.data;
+
+  // Coordinate: se inserite a mano nel form vincono sul geocoding; se lasciate
+  // vuote vengono ricalcolate dall'indirizzo (svuotarle = "rigenera coordinate").
+  let coords: { lat: number | null; lng: number | null };
+  if (manualLat != null && manualLng != null) {
+    coords = { lat: manualLat, lng: manualLng };
+  } else {
+    const geo = await geocodeAddress(data);
+    coords = { lat: geo?.lat ?? null, lng: geo?.lng ?? null };
+  }
 
   if (id) {
-    // Ri-geocodifica solo se i campi che compongono l'indirizzo sono cambiati.
-    const existing = await prisma.address.findUnique({ where: { id } });
-    const locationChanged =
-      !existing ||
-      existing.lat == null ||
-      existing.street !== data.street ||
-      existing.city !== data.city ||
-      existing.province !== data.province ||
-      (existing.postalCode ?? undefined) !== data.postalCode;
-
-    const coords = locationChanged ? await geocodeAddress(data) : null;
-    await prisma.address.update({
-      where: { id },
-      data: coords ? { ...data, lat: coords.lat, lng: coords.lng } : data,
-    });
+    await prisma.address.update({ where: { id }, data: { ...data, ...coords } });
   } else {
-    const coords = await geocodeAddress(data);
-    await prisma.address.create({
-      data: coords ? { ...data, lat: coords.lat, lng: coords.lng } : data,
-    });
+    await prisma.address.create({ data: { ...data, ...coords } });
   }
 
   // Gli indirizzi si gestiscono dalla scheda cliente.

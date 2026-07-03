@@ -12,10 +12,17 @@ type AddressParts = {
   country?: string | null;
 };
 
-/** Compone una query di indirizzo leggibile da Google. */
+/**
+ * Compone una query di indirizzo leggibile da Google. CAP, città e provincia
+ * vengono tenuti insieme ("20098 San Giuliano Milanese MI") per ridurre il
+ * rischio che località con nomi simili vengano confuse.
+ */
 export function formatAddressQuery(a: AddressParts): string {
-  return [a.street, a.postalCode, a.city, a.province, a.country ?? "IT"]
+  const locality = [a.postalCode, a.city, a.province]
     .filter((p) => p != null && String(p).trim().length > 0)
+    .join(" ");
+  return [a.street, locality, "Italia"]
+    .filter((p) => p && String(p).trim().length > 0)
     .join(", ");
 }
 

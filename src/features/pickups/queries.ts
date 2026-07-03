@@ -32,13 +32,17 @@ export type PickupFilters = {
   sourceType?: PickupSourceType;
   timeWindow?: TimeWindow;
   search?: string;
+  unassignedOnly?: boolean;
 };
 
 export function listPickups(filters: PickupFilters = {}) {
-  const where: Prisma.PickupWhereInput = {};
+  // Le prese annullate non compaiono mai (vengono comunque eliminate; restano
+  // solo quelle da ricorrenza come blocco anti-rigenerazione, invisibili).
+  const where: Prisma.PickupWhereInput = { status: { not: "CANCELLED" } };
 
   if (filters.date) where.pickupDate = parseDateOnly(filters.date);
-  if (filters.status) where.status = filters.status;
+  if (filters.status && filters.status !== "CANCELLED") where.status = filters.status;
+  if (filters.unassignedOnly) where.routeStops = { none: {} };
   if (filters.sourceType) where.sourceType = filters.sourceType;
   if (filters.timeWindow) where.timeWindow = filters.timeWindow;
   if (filters.search) {

@@ -66,6 +66,17 @@ export function AddressForm({
         <Field label="Paese" htmlFor="country" error={errors?.country}>
           <input id="country" name="country" defaultValue={address?.country ?? "IT"} className="field-input" />
         </Field>
+        <Field
+          label="Latitudine"
+          htmlFor="lat"
+          error={errors?.lat}
+          hint="Vuota = calcolata dall'indirizzo al salvataggio. Svuota entrambe e salva per rigenerare."
+        >
+          <input id="lat" name="lat" defaultValue={address?.lat ?? ""} placeholder="es. 45.4540" className="field-input" />
+        </Field>
+        <Field label="Longitudine" htmlFor="lng" error={errors?.lng} hint="Correggila a mano se il pin sulla mappa è nel posto sbagliato.">
+          <input id="lng" name="lng" defaultValue={address?.lng ?? ""} placeholder="es. 8.5450" className="field-input" />
+        </Field>
         <Field label="Note" htmlFor="notes" error={errors?.notes} full>
           <textarea id="notes" name="notes" defaultValue={address?.notes ?? ""} rows={2} className="field-input" />
         </Field>
