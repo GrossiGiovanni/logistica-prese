@@ -9,7 +9,13 @@ export type GenerateResult = { created: number; skipped: number };
  * Idempotente: pensata per essere chiamata all'apertura di pianificazione/dashboard
  * così le ricorrenze con giorni+quantità compaiono senza un click manuale.
  */
+// SOSPESO: le prese arrivano tutte dall'import AS400, quindi la generazione
+// automatica delle prese fisse è momentaneamente disattivata. Per riattivarla
+// rimettere il flag a false (e ripristinare la voce "Prese fisse" nel menu).
+const RECURRING_SUSPENDED = true;
+
 export async function ensureRecurringForDate(dateStr: string): Promise<void> {
+  if (RECURRING_SUSPENDED) return;
   // Finestra operativa: da ieri a +7 giorni. Evita che la semplice navigazione
   // su date lontane nel futuro crei prese fisse per quelle date.
   if (dateStr < yesterdayInputValue()) return;

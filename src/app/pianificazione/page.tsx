@@ -9,7 +9,6 @@ import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { getDailyStats } from "@/features/dashboard/queries";
 import { listUnassignedPickups } from "@/features/pickups/queries";
 import { assignPickupToRoute, deleteRoute } from "@/features/routes/actions";
-import { GenerateRecurringForm } from "@/features/recurring-pickups/GenerateRecurringForm";
 import { ensureRecurringForDate } from "@/features/recurring-pickups/generate";
 import {
   routeTotalPallets,
@@ -74,7 +73,6 @@ export default async function PianificazionePage({
         <Link href={`/giri/nuovo?date=${selectedDate}`} className="btn-primary">
           Nuovo giro
         </Link>
-        <GenerateRecurringForm date={selectedDate} redirectTo={redirectTo} compact />
         <Link href={`/prese/nuova?date=${selectedDate}`} className="btn-secondary">
           Nuova presa
         </Link>

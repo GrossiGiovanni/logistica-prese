@@ -23,7 +23,8 @@ const nav: NavItem[] = [
     children: [
       { href: "/prese", label: "Prese" },
       { href: "/importa", label: "Importa" },
-      { href: "/prese-fisse", label: "Prese fisse" },
+      // "Prese fisse" sospesa: le prese arrivano tutte dall'import AS400.
+      // { href: "/prese-fisse", label: "Prese fisse" },
     ],
   },
   { href: "/giri", label: "Giri" },
