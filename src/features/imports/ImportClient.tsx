@@ -9,7 +9,8 @@ import { Badge } from "@/components/badges/Badge";
 
 const STATUS_LABEL = {
   new: { text: "Nuova", tone: "green" as const },
-  existing: { text: "Già presente", tone: "slate" as const },
+  update: { text: "Aggiorna", tone: "blue" as const },
+  existing: { text: "Duplicata", tone: "slate" as const },
   error: { text: "Errore", tone: "red" as const },
 };
 
@@ -61,7 +62,8 @@ export function ImportClient() {
             <span className="font-semibold text-slate-900">{preview.fileName}</span>
             <span>Righe lette: <b>{preview.totalRows}</b></span>
             <span className="text-emerald-700">Nuove: <b>{preview.newCount}</b></span>
-            <span className="text-slate-500">Già presenti: <b>{preview.existingCount}</b></span>
+            <span className="text-brand-700">Da aggiornare: <b>{preview.updateCount}</b></span>
+            <span className="text-slate-500">Duplicate nel file: <b>{preview.existingCount}</b></span>
             <span className={preview.errorCount > 0 ? "text-red-600" : "text-slate-500"}>
               Errori: <b>{preview.errorCount}</b>
             </span>
@@ -109,10 +111,12 @@ export function ImportClient() {
           <div className="mt-3 flex items-center gap-2">
             <button
               onClick={onConfirm}
-              disabled={pending || preview.newCount === 0}
+              disabled={pending || (preview.newCount === 0 && preview.updateCount === 0)}
               className="btn-primary"
             >
-              {pending ? "Import in corso…" : `Conferma import (${preview.newCount} prese)`}
+              {pending
+                ? "Import in corso…"
+                : `Conferma (${preview.newCount} nuove${preview.updateCount > 0 ? ` + ${preview.updateCount} da aggiornare` : ""})`}
             </button>
             <button onClick={() => setPreview(null)} disabled={pending} className="btn-secondary">
               Annulla
@@ -124,9 +128,10 @@ export function ImportClient() {
       {result ? (
         result.ok ? (
           <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            <b>Import completato.</b> Importate: <b>{result.imported}</b> · Saltate (già presenti):{" "}
-            <b>{result.skipped}</b> · Non importate per errore: <b>{result.errors}</b>. Le nuove prese
-            sono in pianificazione alla loro data, non assegnate.
+            <b>Import completato.</b> Importate: <b>{result.imported}</b> · Aggiornate:{" "}
+            <b>{result.updated}</b> · Saltate: <b>{result.skipped}</b> · Errori: <b>{result.errors}</b>.
+            Le nuove prese sono in pianificazione alla loro data, non assegnate; le esistenti
+            hanno i dati aggiornati (giro e stato invariati).
           </div>
         ) : (
           <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">

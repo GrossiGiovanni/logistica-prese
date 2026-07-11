@@ -121,6 +121,7 @@ model Driver {
 
   defaultVehicle Vehicle? @relation("DriverDefaultVehicle", fields: [defaultVehicleId], references: [id], onDelete: SetNull)
   routes         Route[]
+  trailerLogs    TrailerLog[]
 
   @@index([active])
 }
@@ -248,11 +249,29 @@ model Route {
   @@index([status])
 }
 
+// Registro manuale "Autisti Eurosarda": semirimorchio agganciato in porto
+// e servizio effettuato, per controlli successivi.
+model TrailerLog {
+  id           String   @id @default(cuid())
+  logDate      DateTime @db.Date
+  driverId     String
+  trailerPlate String // targa semirimorchio agganciato
+  service      String // servizio effettuato
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  driver Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([logDate])
+  @@index([driverId])
+}
+
 model ImportLog {
   id           String   @id @default(cuid())
   fileName     String
   totalRows    Int
   imported     Int
+  updated      Int      @default(0)
   skipped      Int
   errors       Int
   errorDetails String? // dettagli righe scartate (testo)

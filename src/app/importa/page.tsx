@@ -43,7 +43,7 @@ export default async function ImportaPage() {
                     </span>
                     <span className="text-xs">
                       Righe: {l.totalRows} · <span className="text-emerald-700">importate {l.imported}</span> ·
-                      saltate {l.skipped} ·{" "}
+                      aggiornate {l.updated} · saltate {l.skipped} ·{" "}
                       <span className={l.errors > 0 ? "text-red-600" : ""}>errori {l.errors}</span>
                     </span>
                   </div>

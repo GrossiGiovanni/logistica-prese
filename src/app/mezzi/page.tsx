@@ -10,8 +10,13 @@ import { formatEuro } from "@/lib/costs";
 
 type Row = Awaited<ReturnType<typeof listVehicles>>[number];
 
-export default async function MezziPage() {
-  const vehicles = await listVehicles();
+export default async function MezziPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const { q } = await searchParams;
+  const vehicles = await listVehicles(q);
 
   const columns: Column<Row>[] = [
     {
@@ -82,10 +87,22 @@ export default async function MezziPage() {
         description="Parco mezzi. Le motrici (costo alto) sono evidenziate."
         action={{ href: "/mezzi/nuovo", label: "Nuovo mezzo" }}
       />
+      <form method="get" className="mb-4 flex flex-wrap items-end gap-2">
+        <div className="grow">
+          <label className="field-label">Cerca mezzo</label>
+          <input type="text" name="q" defaultValue={q ?? ""} placeholder="Nome, targa, titolare, tipo (es. motrice)…" className="field-input" />
+        </div>
+        <button type="submit" className="btn-primary">Cerca</button>
+        {q ? <a href="/mezzi" className="btn-secondary">Azzera</a> : null}
+      </form>
       <DataTable
         columns={columns}
         rows={vehicles}
-        empty={{ title: "Nessun mezzo", action: { href: "/mezzi/nuovo", label: "Nuovo mezzo" } }}
+        empty={{
+          title: q ? "Nessun mezzo trovato" : "Nessun mezzo",
+          description: q ? `Nessun mezzo corrisponde a "${q}".` : undefined,
+          action: { href: "/mezzi/nuovo", label: "Nuovo mezzo" },
+        }}
       />
     </div>
   );

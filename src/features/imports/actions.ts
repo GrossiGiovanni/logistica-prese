@@ -15,7 +15,7 @@ const key = (s: string | null | undefined) =>
   (s ?? "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
 
 export type PreviewRow = ParsedRow & {
-  status: "new" | "existing" | "error";
+  status: "new" | "update" | "existing" | "error";
   reason?: string;
 };
 
@@ -25,13 +25,14 @@ export type ImportPreview = {
   fileName: string;
   totalRows: number;
   newCount: number;
+  updateCount: number;
   existingCount: number;
   errorCount: number;
   rows: PreviewRow[];
 };
 
 export async function previewImport(formData: FormData): Promise<ImportPreview> {
-  const empty = { fileName: "", totalRows: 0, newCount: 0, existingCount: 0, errorCount: 0, rows: [] };
+  const empty = { fileName: "", totalRows: 0, newCount: 0, updateCount: 0, existingCount: 0, errorCount: 0, rows: [] };
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
     return { ok: false, error: "Seleziona un file .xlsx.", ...empty };
@@ -68,13 +69,13 @@ export async function previewImport(formData: FormData): Promise<ImportPreview> 
     if (missing.length) {
       return { ...r, status: "error", reason: `Dati mancanti: ${missing.join(", ")}` };
     }
-    if (existingNumbers.has(r.numero!)) {
-      return { ...r, status: "existing", reason: "Già presente in dashboard" };
-    }
     if (seenInFile.has(r.numero!)) {
-      return { ...r, status: "existing", reason: "Duplicata nel file" };
+      return { ...r, status: "existing", reason: "Duplicata nel file (ignorata)" };
     }
     seenInFile.add(r.numero!);
+    if (existingNumbers.has(r.numero!)) {
+      return { ...r, status: "update", reason: "Già presente: dati aggiornati" };
+    }
     return { ...r, status: "new" };
   });
 
@@ -83,6 +84,7 @@ export async function previewImport(formData: FormData): Promise<ImportPreview> 
     fileName: file.name,
     totalRows: rows.length,
     newCount: rows.filter((r) => r.status === "new").length,
+    updateCount: rows.filter((r) => r.status === "update").length,
     existingCount: rows.filter((r) => r.status === "existing").length,
     errorCount: rows.filter((r) => r.status === "error").length,
     rows,
@@ -99,22 +101,32 @@ export type ImportResult = {
   ok: boolean;
   error?: string;
   imported: number;
+  updated: number;
   skipped: number;
   errors: number;
 };
 
 export async function confirmImport(preview: ImportPreview): Promise<ImportResult> {
   const newRows = preview.rows.filter((r) => r.status === "new");
-  if (newRows.length === 0) {
-    return { ok: false, error: "Nessuna presa nuova da importare.", imported: 0, skipped: 0, errors: 0 };
+  const updateRows = preview.rows.filter((r) => r.status === "update");
+  if (newRows.length === 0 && updateRows.length === 0) {
+    return { ok: false, error: "Nessuna presa da importare o aggiornare.", imported: 0, updated: 0, skipped: 0, errors: 0 };
   }
 
-  // Ricontrollo di sicurezza sui numeri (nel frattempo potrebbero essere stati importati)
+  // Mappa numero presa (normalizzato) -> presa esistente, per creare o aggiornare.
   const existing = await prisma.pickup.findMany({
     where: { pickupNumber: { not: null } },
-    select: { pickupNumber: true },
+    select: {
+      id: true,
+      pickupNumber: true,
+      status: true,
+      _count: { select: { routeStops: true } },
+    },
   });
-  const existingNumbers = new Set(existing.map((p) => normalizePickupNumber(p.pickupNumber)));
+  const existingByNumber = new Map(
+    existing.map((p) => [normalizePickupNumber(p.pickupNumber), p]),
+  );
+  const existingNumbers = new Set(existingByNumber.keys());
 
   // Cache clienti/indirizzi esistenti (dedup per nome / cliente+via+città)
   const customers = await prisma.customer.findMany({ select: { id: true, name: true } });
@@ -127,9 +139,46 @@ export async function confirmImport(preview: ImportPreview): Promise<ImportResul
   );
 
   let imported = 0;
+  let updated = 0;
   let skipped = 0;
   let errors = 0;
   const errorDetails: string[] = [];
+
+  // --- AGGIORNAMENTO prese già presenti (numero presa = identificativo univoco).
+  // Sovrascrive i dati provenienti da AS400; NON tocca giro, stato PLANNED,
+  // cliente/indirizzo. La data viene aggiornata solo se la presa non è in un giro.
+  for (const r of updateRows) {
+    try {
+      const target = existingByNumber.get(r.numero!);
+      if (!target) {
+        skipped++;
+        continue;
+      }
+      const hasLoad = r.pallets != null || r.loadingMeters != null || r.volumeM3 != null;
+      await prisma.pickup.update({
+        where: { id: target.id },
+        data: {
+          pallets: r.pallets,
+          colli: r.colli,
+          loadingMeters: r.loadingMeters,
+          weightKg: r.weightKg,
+          volumeM3: r.volumeM3,
+          rawNotes: r.rawNotes,
+          requiresMotrice: r.requiresMotrice,
+          timeWindow: r.timeWindow,
+          timeFrom: r.timeFrom,
+          ...(target._count.routeStops === 0
+            ? { pickupDate: new Date(`${r.date}T00:00:00.000Z`) }
+            : {}),
+          ...(target.status === "DRAFT" && hasLoad ? { status: "READY" as const } : {}),
+        },
+      });
+      updated++;
+    } catch (err) {
+      errors++;
+      errorDetails.push(`Riga ${r.rowNumber} (${r.numero ?? "?"}): ${err instanceof Error ? err.message : "errore"}`);
+    }
+  }
 
   for (const r of newRows) {
     try {
@@ -191,6 +240,7 @@ export async function confirmImport(preview: ImportPreview): Promise<ImportResul
       fileName: preview.fileName,
       totalRows: preview.totalRows,
       imported,
+      updated,
       skipped: skipped + preview.existingCount,
       errors: errors + preview.errorCount,
       errorDetails: [...previewErrors, ...errorDetails].join("\n") || null,
@@ -202,5 +252,5 @@ export async function confirmImport(preview: ImportPreview): Promise<ImportResul
   revalidatePath("/dashboard");
   revalidatePath("/importa");
 
-  return { ok: true, imported, skipped: skipped + preview.existingCount, errors: errors + preview.errorCount };
+  return { ok: true, imported, updated, skipped: skipped + preview.existingCount, errors: errors + preview.errorCount };
 }

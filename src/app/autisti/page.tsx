@@ -8,8 +8,13 @@ import { deleteDriver } from "@/features/drivers/actions";
 
 type Row = Awaited<ReturnType<typeof listDrivers>>[number];
 
-export default async function AutistiPage() {
-  const drivers = await listDrivers();
+export default async function AutistiPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const { q } = await searchParams;
+  const drivers = await listDrivers(q);
 
   const columns: Column<Row>[] = [
     {
@@ -52,10 +57,22 @@ export default async function AutistiPage() {
         description="Anagrafica autisti"
         action={{ href: "/autisti/nuovo", label: "Nuovo autista" }}
       />
+      <form method="get" className="mb-4 flex flex-wrap items-end gap-2">
+        <div className="grow">
+          <label className="field-label">Cerca autista</label>
+          <input type="text" name="q" defaultValue={q ?? ""} placeholder="Nome, codice, telefono, mezzo/targa…" className="field-input" />
+        </div>
+        <button type="submit" className="btn-primary">Cerca</button>
+        {q ? <a href="/autisti" className="btn-secondary">Azzera</a> : null}
+      </form>
       <DataTable
         columns={columns}
         rows={drivers}
-        empty={{ title: "Nessun autista", action: { href: "/autisti/nuovo", label: "Nuovo autista" } }}
+        empty={{
+          title: q ? "Nessun autista trovato" : "Nessun autista",
+          description: q ? `Nessun autista corrisponde a "${q}".` : undefined,
+          action: { href: "/autisti/nuovo", label: "Nuovo autista" },
+        }}
       />
     </div>
   );
