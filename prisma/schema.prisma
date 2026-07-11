@@ -113,6 +113,7 @@ model Driver {
   code             String?
   phone            String? // Telefono/WhatsApp in formato internazionale (es. +39...)
   whatsappEnabled  Boolean  @default(true)
+  isEurosarda      Boolean  @default(false) // compare nella sezione "Autisti Eurosarda"
   defaultVehicleId String?
   active           Boolean  @default(true)
   notes            String?

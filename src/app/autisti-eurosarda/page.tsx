@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { DataTable, type Column } from "@/components/tables/DataTable";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { createTrailerLog, deleteTrailerLog } from "@/features/trailer-logs/actions";
-import { listActiveDrivers } from "@/features/drivers/queries";
+import { listEurosardaDrivers } from "@/features/drivers/queries";
 import { prisma } from "@/lib/db";
 import { formatDateIt, todayInputValue, parseDateOnly, isValidDateInput } from "@/lib/dates";
 
@@ -16,11 +16,12 @@ export default async function AutistiEurosardaPage({
 
   const [logs, drivers] = await Promise.all([
     prisma.trailerLog.findMany({
-      where: { logDate: parseDateOnly(selectedDate) },
+      // Solo registrazioni di autisti con flag "Autista Eurosarda" attivo.
+      where: { logDate: parseDateOnly(selectedDate), driver: { isEurosarda: true } },
       include: { driver: { select: { name: true } } },
       orderBy: { createdAt: "asc" },
     }),
-    listActiveDrivers(),
+    listEurosardaDrivers(),
   ]);
 
   type Row = (typeof logs)[number];
@@ -59,6 +60,13 @@ export default async function AutistiEurosardaPage({
         </div>
         <button type="submit" className="btn-secondary">Vai al giorno</button>
       </form>
+
+      {drivers.length === 0 ? (
+        <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+          Nessun autista con il flag &quot;Autista Eurosarda&quot;. Attivalo dalla scheda autista
+          (Anagrafica → Autisti → Modifica).
+        </p>
+      ) : null}
 
       {/* Inserimento nuova registrazione */}
       <form action={createTrailerLog} className="card mb-4 flex flex-wrap items-end gap-3 p-4">

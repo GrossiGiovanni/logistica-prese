@@ -48,8 +48,13 @@ export function DriverForm({
           </select>
         </Field>
         <Field label="Stato">
-          <div className="pt-2">
+          <div className="flex flex-wrap gap-6 pt-2">
             <CheckboxField label="Attivo" name="active" defaultChecked={driver?.active ?? true} />
+            <CheckboxField
+              label="Autista Eurosarda"
+              name="isEurosarda"
+              defaultChecked={driver?.isEurosarda ?? false}
+            />
           </div>
         </Field>
         <Field label="Note" htmlFor="notes" error={errors?.notes} full>

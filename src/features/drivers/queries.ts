@@ -30,6 +30,14 @@ export function listActiveDrivers() {
   });
 }
 
+/** Autisti attivi con flag "Autista Eurosarda" (sezione dedicata). */
+export function listEurosardaDrivers() {
+  return prisma.driver.findMany({
+    where: { active: true, isEurosarda: true },
+    orderBy: { name: "asc" },
+  });
+}
+
 export function getDriver(id: string) {
   return prisma.driver.findUnique({ where: { id } });
 }

@@ -24,6 +24,7 @@ export default async function AutistiPage({
           <Link href={`/autisti/${d.id}/modifica`} className="font-medium text-brand-700 hover:underline">
             {d.name}
           </Link>
+          {d.isEurosarda ? <Badge tone="blue">Eurosarda</Badge> : null}
           {!d.active ? <Badge tone="slate">Inattivo</Badge> : null}
         </div>
       ),
