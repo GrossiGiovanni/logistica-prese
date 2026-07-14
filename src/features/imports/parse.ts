@@ -30,6 +30,17 @@ export function normalizePickupNumber(v: string | null | undefined): string {
   return (v ?? "").replace(/\s+/g, " ").trim().toUpperCase();
 }
 
+/**
+ * Chiave canonica del numero presa per il match tra estrazioni diverse:
+ * AS400 a volte esporta "2026 13 9005032" e a volte solo "9005032" — il vero
+ * identificativo è l'ultimo segmento numerico.
+ */
+export function pickupNumberKey(v: string | null | undefined): string {
+  const norm = normalizePickupNumber(v);
+  const parts = norm.split(" ");
+  return parts[parts.length - 1] || norm;
+}
+
 function cellText(value: ExcelJS.CellValue): string | null {
   if (value == null) return null;
   if (value instanceof Date) return value.toISOString();
@@ -159,12 +170,12 @@ export async function parseAs400Workbook(buffer: ArrayBuffer): Promise<ParseResu
   const iMittente = headerIndex(headers, "Mittente");
   const iIndirizzo = headerIndex(headers, "Indirizzo");
   const iLocalita = headerIndex(headers, "Località", "Localita");
-  const iProv = headerIndex(headers, "Pro", "Prov", "Prov.", "Provincia");
+  const iProv = headerIndex(headers, "Pro", "Prov", "Prov.", "Provincia", "Zona");
   const iPlt = headerIndex(headers, "plt", "pallet", "note1");
   const iNote = headerIndex(headers, "note", "NOTE");
   const iColli = headerIndex(headers, "Colli");
-  const iPeso = headerIndex(headers, "Peso");
-  const iMcu = headerIndex(headers, "M.cu", "Mcu", "MC", "M.cubi", "Mcubi");
+  const iPeso = headerIndex(headers, "Peso", "PRESO"); // "PRESO" = peso nelle estrazioni mensili
+  const iMcu = headerIndex(headers, "M.cu", "Mcu", "MC", "M.cubi", "Mcubi", "M.CUBI");
 
   if (iNumero === -1 || iData === -1 || iMittente === -1) {
     return {

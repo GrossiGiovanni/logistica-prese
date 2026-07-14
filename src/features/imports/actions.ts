@@ -9,7 +9,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { parseAs400Workbook, normalizePickupNumber, type ParsedRow } from "./parse";
+import { parseAs400Workbook, pickupNumberKey, type ParsedRow } from "./parse";
 
 const key = (s: string | null | undefined) =>
   (s ?? "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
@@ -19,9 +19,12 @@ export type PreviewRow = ParsedRow & {
   reason?: string;
 };
 
+export type ImportMode = "operativo" | "aggiornamento";
+
 export type ImportPreview = {
   ok: boolean;
   error?: string;
+  mode: ImportMode;
   fileName: string;
   totalRows: number;
   newCount: number;
@@ -32,7 +35,8 @@ export type ImportPreview = {
 };
 
 export async function previewImport(formData: FormData): Promise<ImportPreview> {
-  const empty = { fileName: "", totalRows: 0, newCount: 0, updateCount: 0, existingCount: 0, errorCount: 0, rows: [] };
+  const mode: ImportMode = formData.get("mode") === "aggiornamento" ? "aggiornamento" : "operativo";
+  const empty = { mode, fileName: "", totalRows: 0, newCount: 0, updateCount: 0, existingCount: 0, errorCount: 0, rows: [] };
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
     return { ok: false, error: "Seleziona un file .xlsx.", ...empty };
@@ -52,35 +56,51 @@ export async function previewImport(formData: FormData): Promise<ImportPreview> 
     return { ok: false, error: parsed.headerError, ...empty, fileName: file.name };
   }
 
-  // Numeri presa già in dashboard (confronto normalizzato)
+  // Numeri presa già in dashboard (match sul segmento finale del numero:
+  // "2026 13 9005032" e "9005032" sono la stessa presa)
   const existing = await prisma.pickup.findMany({
     where: { pickupNumber: { not: null } },
     select: { pickupNumber: true },
   });
-  const existingNumbers = new Set(existing.map((p) => normalizePickupNumber(p.pickupNumber)));
+  const existingNumbers = new Set(existing.map((p) => pickupNumberKey(p.pickupNumber)));
 
   const seenInFile = new Set<string>();
   const rows: PreviewRow[] = parsed.rows.map((r) => {
-    const missing: string[] = [];
-    if (!r.numero) missing.push("numero presa");
-    if (!r.date) missing.push("data");
-    if (!r.mittente) missing.push("mittente");
-    if (!r.street || !r.city) missing.push("indirizzo/località");
-    if (missing.length) {
-      return { ...r, status: "error", reason: `Dati mancanti: ${missing.join(", ")}` };
+    const key = pickupNumberKey(r.numero);
+    if (!r.numero || !key) {
+      return { ...r, status: "error", reason: "Dati mancanti: numero presa" };
     }
-    if (seenInFile.has(r.numero!)) {
+    if (mode === "operativo") {
+      const missing: string[] = [];
+      if (!r.date) missing.push("data");
+      if (!r.mittente) missing.push("mittente");
+      if (!r.street || !r.city) missing.push("indirizzo/località");
+      if (missing.length) {
+        return { ...r, status: "error", reason: `Dati mancanti: ${missing.join(", ")}` };
+      }
+    }
+    if (seenInFile.has(key)) {
       return { ...r, status: "existing", reason: "Duplicata nel file (ignorata)" };
     }
-    seenInFile.add(r.numero!);
-    if (existingNumbers.has(r.numero!)) {
-      return { ...r, status: "update", reason: "Già presente: dati aggiornati" };
+    seenInFile.add(key);
+    if (existingNumbers.has(key)) {
+      return {
+        ...r,
+        status: "update",
+        reason: mode === "aggiornamento" ? "Aggiorna peso/volume/colli" : "Già presente: dati aggiornati",
+      };
+    }
+    // In modalità aggiornamento le prese non presenti a sistema vengono ignorate
+    // (questo import non crea mai nuove prese da pianificare).
+    if (mode === "aggiornamento") {
+      return { ...r, status: "existing", reason: "Non presente a sistema (ignorata)" };
     }
     return { ...r, status: "new" };
   });
 
   return {
     ok: true,
+    mode,
     fileName: file.name,
     totalRows: rows.length,
     newCount: rows.filter((r) => r.status === "new").length,
@@ -113,20 +133,24 @@ export async function confirmImport(preview: ImportPreview): Promise<ImportResul
     return { ok: false, error: "Nessuna presa da importare o aggiornare.", imported: 0, updated: 0, skipped: 0, errors: 0 };
   }
 
-  // Mappa numero presa (normalizzato) -> presa esistente, per creare o aggiornare.
+  // Mappa chiave numero presa -> presa esistente, per creare o aggiornare.
   const existing = await prisma.pickup.findMany({
     where: { pickupNumber: { not: null } },
     select: {
       id: true,
       pickupNumber: true,
       status: true,
+      pallets: true,
+      loadingMeters: true,
+      rawNotes: true,
       _count: { select: { routeStops: true } },
     },
   });
   const existingByNumber = new Map(
-    existing.map((p) => [normalizePickupNumber(p.pickupNumber), p]),
+    existing.map((p) => [pickupNumberKey(p.pickupNumber), p]),
   );
   const existingNumbers = new Set(existingByNumber.keys());
+  const aggiornamento = preview.mode === "aggiornamento";
 
   // Cache clienti/indirizzi esistenti (dedup per nome / cliente+via+città)
   const customers = await prisma.customer.findMany({ select: { id: true, name: true } });
@@ -144,35 +168,56 @@ export async function confirmImport(preview: ImportPreview): Promise<ImportResul
   let errors = 0;
   const errorDetails: string[] = [];
 
-  // --- AGGIORNAMENTO prese già presenti (numero presa = identificativo univoco).
-  // Sovrascrive i dati provenienti da AS400; NON tocca giro, stato PLANNED,
-  // cliente/indirizzo. La data viene aggiornata solo se la presa non è in un giro.
+  // --- AGGIORNAMENTO prese già presenti (chiave = numero presa).
+  // Modalità "aggiornamento dati": tocca SOLO peso/volume/colli e riempie i
+  // dati mancanti (pallet/MTL/note se vuoti). Non cambia stato, data, fascia,
+  // giro o assegnazioni: la pianificazione resta com'è.
+  // Modalità "operativo": sovrascrive anche carico/fascia/note; la data solo
+  // se la presa non è in un giro; stato DRAFT->READY se arrivano dati.
   for (const r of updateRows) {
     try {
-      const target = existingByNumber.get(r.numero!);
+      const target = existingByNumber.get(pickupNumberKey(r.numero));
       if (!target) {
         skipped++;
         continue;
       }
-      const hasLoad = r.pallets != null || r.loadingMeters != null || r.volumeM3 != null;
-      await prisma.pickup.update({
-        where: { id: target.id },
-        data: {
-          pallets: r.pallets,
-          colli: r.colli,
-          loadingMeters: r.loadingMeters,
-          weightKg: r.weightKg,
-          volumeM3: r.volumeM3,
-          rawNotes: r.rawNotes,
-          requiresMotrice: r.requiresMotrice,
-          timeWindow: r.timeWindow,
-          timeFrom: r.timeFrom,
-          ...(target._count.routeStops === 0
-            ? { pickupDate: new Date(`${r.date}T00:00:00.000Z`) }
-            : {}),
-          ...(target.status === "DRAFT" && hasLoad ? { status: "READY" as const } : {}),
-        },
-      });
+
+      if (aggiornamento) {
+        await prisma.pickup.update({
+          where: { id: target.id },
+          data: {
+            ...(r.weightKg != null ? { weightKg: r.weightKg } : {}),
+            ...(r.volumeM3 != null ? { volumeM3: r.volumeM3 } : {}),
+            ...(r.colli != null ? { colli: r.colli } : {}),
+            // Dati mancanti: riempiti solo se assenti sulla presa.
+            ...(target.pallets == null && r.pallets != null ? { pallets: r.pallets } : {}),
+            ...(target.loadingMeters == null && r.loadingMeters != null
+              ? { loadingMeters: r.loadingMeters }
+              : {}),
+            ...(!target.rawNotes && r.rawNotes ? { rawNotes: r.rawNotes } : {}),
+          },
+        });
+      } else {
+        const hasLoad = r.pallets != null || r.loadingMeters != null || r.volumeM3 != null;
+        await prisma.pickup.update({
+          where: { id: target.id },
+          data: {
+            pallets: r.pallets,
+            colli: r.colli,
+            loadingMeters: r.loadingMeters,
+            weightKg: r.weightKg,
+            volumeM3: r.volumeM3,
+            rawNotes: r.rawNotes,
+            requiresMotrice: r.requiresMotrice,
+            timeWindow: r.timeWindow,
+            timeFrom: r.timeFrom,
+            ...(target._count.routeStops === 0
+              ? { pickupDate: new Date(`${r.date}T00:00:00.000Z`) }
+              : {}),
+            ...(target.status === "DRAFT" && hasLoad ? { status: "READY" as const } : {}),
+          },
+        });
+      }
       updated++;
     } catch (err) {
       errors++;
@@ -182,7 +227,7 @@ export async function confirmImport(preview: ImportPreview): Promise<ImportResul
 
   for (const r of newRows) {
     try {
-      if (existingNumbers.has(r.numero!)) {
+      if (existingNumbers.has(pickupNumberKey(r.numero))) {
         skipped++;
         continue;
       }
@@ -223,7 +268,7 @@ export async function confirmImport(preview: ImportPreview): Promise<ImportResul
           internalNotes: `Import AS400: ${preview.fileName}`,
         },
       });
-      existingNumbers.add(r.numero!);
+      existingNumbers.add(pickupNumberKey(r.numero));
       imported++;
     } catch (err) {
       errors++;
