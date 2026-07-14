@@ -27,7 +27,7 @@ import {
   hasMissingData,
 } from "@/lib/warnings";
 import { routeTotalCost, formatEuro } from "@/lib/costs";
-import { addressToQuery } from "@/lib/distance";
+import { pointParam } from "@/lib/distance";
 import { RouteMapEmbed } from "@/features/map/RouteMapEmbed";
 import { WhatsAppButton } from "@/features/routes/WhatsAppButton";
 import {
@@ -76,7 +76,8 @@ export default async function GiroDettaglioPage({
   const warnings = getRouteWarnings(route);
   const redirectTo = `/giri/${route.id}`;
 
-  const stopAddresses = route.stops.map((s) => addressToQuery(s.pickup.address));
+  // Waypoint = coordinate salvate (le stesse del calcolo km), testo in riserva.
+  const stopAddresses = route.stops.map((s) => pointParam(s.pickup.address));
   const mapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
 
   // WhatsApp: visibile solo con autista WhatsApp-abilitato e almeno una presa.

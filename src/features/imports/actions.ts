@@ -9,6 +9,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
+import { geocodeAddress } from "@/lib/geocode";
 import { parseAs400Workbook, pickupNumberKey, type ParsedRow } from "./parse";
 
 const key = (s: string | null | undefined) =>
@@ -240,8 +241,20 @@ export async function confirmImport(preview: ImportPreview): Promise<ImportResul
       const aKey = `${customerId}|${key(r.street)}|${key(r.city)}`;
       let addressId = addressByKey.get(aKey);
       if (!addressId) {
+        // Geocodifica subito (best-effort): pin mappa e km useranno le coordinate.
+        const coords = await geocodeAddress({
+          street: r.street!,
+          city: r.city!,
+          province: r.province ?? "",
+        });
         const a = await prisma.address.create({
-          data: { customerId, street: r.street!, city: r.city!, province: r.province ?? "" },
+          data: {
+            customerId,
+            street: r.street!,
+            city: r.city!,
+            province: r.province ?? "",
+            ...(coords ? { lat: coords.lat, lng: coords.lng } : {}),
+          },
         });
         addressId = a.id;
         addressByKey.set(aKey, addressId);

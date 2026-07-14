@@ -3,7 +3,7 @@
 // Esecuzione: npx tsx prisma/backfill-km.ts
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
-import { computeRouteKm, addressToQuery } from "../src/lib/distance";
+import { computeRouteKm } from "../src/lib/distance";
 
 const prisma = new PrismaClient();
 
@@ -20,8 +20,7 @@ async function main() {
 
   for (const r of routes) {
     if (r.stops.length === 0) continue;
-    const addresses = r.stops.map((s) => addressToQuery(s.pickup.address));
-    const result = await computeRouteKm(addresses);
+    const result = await computeRouteKm(r.stops.map((s) => s.pickup.address));
     if (result.km != null) {
       await prisma.route.update({ where: { id: r.id }, data: { km: result.km } });
       console.log(`  ${r.vehicle?.name ?? "-"}: ${result.km} km`);

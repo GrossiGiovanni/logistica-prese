@@ -17,7 +17,7 @@ import {
   hasLoadData,
   routeWarningLabels,
 } from "@/lib/warnings";
-import { WAREHOUSE_COORDS, addressToQuery, fetchRoutePolyline } from "@/lib/distance";
+import { WAREHOUSE_COORDS, fetchRoutePolyline } from "@/lib/distance";
 import {
   timeWindowLabels,
   priorityLabels,
@@ -92,7 +92,7 @@ export default async function PianificazionePlusPage({
   const polylines = await Promise.all(
     routesRaw.map((r) =>
       r.stops.length > 0
-        ? fetchRoutePolyline(r.stops.map((s) => addressToQuery(s.pickup.address)))
+        ? fetchRoutePolyline(r.stops.map((s) => s.pickup.address))
         : Promise.resolve(null),
     ),
   );

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { routeSchema, parseForm, type ActionResult } from "@/lib/validations";
 import { parseDateOnly, isValidDateInput } from "@/lib/dates";
-import { computeRouteKm, addressToQuery } from "@/lib/distance";
+import { computeRouteKm } from "@/lib/distance";
 
 function revalidateRoutes(routeId?: string) {
   revalidatePath("/giri");
@@ -28,14 +28,21 @@ export async function recalcRouteKm(routeId: string): Promise<void> {
         pickup: {
           select: {
             address: {
-              select: { street: true, city: true, province: true, postalCode: true },
+              select: {
+                street: true,
+                city: true,
+                province: true,
+                postalCode: true,
+                lat: true,
+                lng: true,
+              },
             },
           },
         },
       },
     });
-    const addresses = stops.map((s) => addressToQuery(s.pickup.address));
-    const result = await computeRouteKm(addresses);
+    // Waypoint = coordinate salvate (le stesse dei pin mappa), testo in riserva.
+    const result = await computeRouteKm(stops.map((s) => s.pickup.address));
     // Salva solo se abbiamo un km valido o se il giro è vuoto (km=null corretto).
     // In caso di chiave assente o errore API NON sovrascrive l'ultimo km buono.
     if (result.km != null || result.reason === "no_stops") {

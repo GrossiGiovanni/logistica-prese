@@ -3,11 +3,18 @@
 //   magazzino -> 1ª presa -> ... -> ultima presa -> magazzino
 // seguendo l'ordine delle fermate (nessuna ottimizzazione: l'ordine è deciso
 // dall'operatore). Richiede GOOGLE_MAPS_API_KEY (Directions API abilitata).
+//
+// COERENZA KM/MAPPA: come waypoint si usano le COORDINATE salvate dell'indirizzo
+// (le stesse dei pin sulla mappa); il testo dell'indirizzo è solo la riserva per
+// gli indirizzi non ancora geocodificati. Così i km salvati, il percorso in
+// mappa e Google Maps partono dagli stessi punti.
 
 // Indirizzo del magazzino (partenza/arrivo di ogni giro). Modificabile qui.
 export const WAREHOUSE_ADDRESS = "Via Ticino 33, 20098 San Giuliano Milanese MI, Italia";
 // Coordinate del magazzino (geocodificate una tantum dall'indirizzo sopra).
 export const WAREHOUSE_COORDS = { lat: 45.3839047, lng: 9.2535401 };
+// Parametro origine/destinazione per le API Google (coordinate precise).
+export const WAREHOUSE_PARAM = `${WAREHOUSE_COORDS.lat},${WAREHOUSE_COORDS.lng}`;
 
 type AddressParts = {
   street: string;
@@ -17,6 +24,12 @@ type AddressParts = {
   country?: string | null;
 };
 
+/** Indirizzo con eventuali coordinate salvate (waypoint preferito). */
+export type RoutePoint = AddressParts & {
+  lat?: number | null;
+  lng?: number | null;
+};
+
 /** Compone una stringa indirizzo per la geocodifica interna di Directions. */
 export function addressToQuery(a: AddressParts): string {
   return [a.street, a.postalCode, a.city, a.province, a.country ?? "IT"]
@@ -24,31 +37,40 @@ export function addressToQuery(a: AddressParts): string {
     .join(", ");
 }
 
+/** Waypoint per le API Google: coordinate salvate se presenti, altrimenti testo. */
+export function pointParam(p: RoutePoint): string {
+  if (p.lat != null && p.lng != null) return `${p.lat},${p.lng}`;
+  return addressToQuery(p);
+}
+
 export type RouteKmResult =
   | { km: number; reason: null }
   | { km: null; reason: "no_key" | "no_stops" | "api_error" };
+
+function directionsUrl(points: RoutePoint[], apiKey: string): URL {
+  const url = new URL("https://maps.googleapis.com/maps/api/directions/json");
+  url.searchParams.set("origin", WAREHOUSE_PARAM);
+  url.searchParams.set("destination", WAREHOUSE_PARAM);
+  url.searchParams.set("waypoints", points.map(pointParam).join("|"));
+  url.searchParams.set("mode", "driving");
+  url.searchParams.set("region", "it");
+  url.searchParams.set("key", apiKey);
+  return url;
+}
 
 /**
  * Calcola i km totali del percorso magazzino → fermate (in ordine) → magazzino.
  * Best-effort: non lancia mai; in caso di errore/chiave assente restituisce km=null
  * con il motivo, così l'operazione chiamante (assegna/rimuovi/riordina) non fallisce.
  */
-export async function computeRouteKm(stopAddresses: string[]): Promise<RouteKmResult> {
-  if (stopAddresses.length === 0) return { km: null, reason: "no_stops" };
+export async function computeRouteKm(points: RoutePoint[]): Promise<RouteKmResult> {
+  if (points.length === 0) return { km: null, reason: "no_stops" };
 
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) return { km: null, reason: "no_key" };
 
-  const url = new URL("https://maps.googleapis.com/maps/api/directions/json");
-  url.searchParams.set("origin", WAREHOUSE_ADDRESS);
-  url.searchParams.set("destination", WAREHOUSE_ADDRESS);
-  url.searchParams.set("waypoints", stopAddresses.join("|"));
-  url.searchParams.set("mode", "driving");
-  url.searchParams.set("region", "it");
-  url.searchParams.set("key", apiKey);
-
   try {
-    const res = await fetch(url, { cache: "no-store" });
+    const res = await fetch(directionsUrl(points, apiKey), { cache: "no-store" });
     if (!res.ok) {
       console.warn(`[distance] HTTP ${res.status}`);
       return { km: null, reason: "api_error" };
@@ -77,21 +99,13 @@ export async function computeRouteKm(stopAddresses: string[]): Promise<RouteKmRe
  * Polyline (codificata) del percorso magazzino → fermate → magazzino, per il
  * disegno del giro su mappa. Best-effort: null se chiave assente o errore.
  */
-export async function fetchRoutePolyline(stopAddresses: string[]): Promise<string | null> {
-  if (stopAddresses.length === 0) return null;
+export async function fetchRoutePolyline(points: RoutePoint[]): Promise<string | null> {
+  if (points.length === 0) return null;
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) return null;
 
-  const url = new URL("https://maps.googleapis.com/maps/api/directions/json");
-  url.searchParams.set("origin", WAREHOUSE_ADDRESS);
-  url.searchParams.set("destination", WAREHOUSE_ADDRESS);
-  url.searchParams.set("waypoints", stopAddresses.join("|"));
-  url.searchParams.set("mode", "driving");
-  url.searchParams.set("region", "it");
-  url.searchParams.set("key", apiKey);
-
   try {
-    const res = await fetch(url, { cache: "no-store" });
+    const res = await fetch(directionsUrl(points, apiKey), { cache: "no-store" });
     if (!res.ok) return null;
     const data = (await res.json()) as {
       status: string;

@@ -5,7 +5,7 @@
 // abilitata e restrizione per referrer HTTP). È un componente server: costruisce
 // solo l'URL dell'iframe, nessun JavaScript lato client.
 
-import { WAREHOUSE_ADDRESS } from "@/lib/distance";
+import { WAREHOUSE_PARAM } from "@/lib/distance";
 
 export function RouteMapEmbed({
   stopAddresses,
@@ -32,8 +32,8 @@ export function RouteMapEmbed({
 
   const params = new URLSearchParams({
     key: apiKey,
-    origin: WAREHOUSE_ADDRESS,
-    destination: WAREHOUSE_ADDRESS,
+    origin: WAREHOUSE_PARAM,
+    destination: WAREHOUSE_PARAM,
     mode: "driving",
     units: "metric",
   });
