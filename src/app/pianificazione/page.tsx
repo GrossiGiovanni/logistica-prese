@@ -9,7 +9,9 @@ import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { getDailyStats } from "@/features/dashboard/queries";
 import { listUnassignedPickups } from "@/features/pickups/queries";
 import { assignPickupToRoute, deleteRoute } from "@/features/routes/actions";
+import { deleteReso } from "@/features/resi/actions";
 import { ensureRecurringForDate } from "@/features/recurring-pickups/generate";
+import { prisma } from "@/lib/db";
 import {
   routeTotalPallets,
   routeOccupiedMeters,
@@ -47,12 +49,20 @@ export default async function PianificazionePage({
   // automatici: l'operatore li crea manualmente.
   await ensureRecurringForDate(selectedDate);
 
-  const [{ routes, kpi }, unassigned] = await Promise.all([
+  const [{ routes, kpi }, unassigned, resi] = await Promise.all([
     getDailyStats(selectedDate),
     listUnassignedPickups(selectedDate, {
       search: q || undefined,
       timeWindow: (tw as TimeWindow) || undefined,
       priority: (prio as Priority) || undefined,
+    }),
+    prisma.reso.findMany({
+      where: { resoDate: parseDateOnly(selectedDate) },
+      include: {
+        customer: { select: { name: true } },
+        address: { select: { city: true, province: true } },
+      },
+      orderBy: { createdAt: "asc" },
     }),
   ]);
 
@@ -75,6 +85,9 @@ export default async function PianificazionePage({
         </Link>
         <Link href={`/prese/nuova?date=${selectedDate}`} className="btn-secondary">
           Nuova presa
+        </Link>
+        <Link href={`/resi/nuovo?date=${selectedDate}`} className="btn-secondary">
+          Nuovo reso
         </Link>
       </div>
 
@@ -234,6 +247,56 @@ export default async function PianificazionePage({
             </ul>
           )}
         </div>
+      </div>
+
+      {/* RESI: consegne di resi al cliente senza ritiro associato */}
+      <div className="mt-6">
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-slate-900">Resi del giorno ({resi.length})</h2>
+          <Link href={`/resi/nuovo?date=${selectedDate}`} className="btn-secondary">Nuovo reso</Link>
+        </div>
+        {resi.length === 0 ? (
+          <div className="card px-4 py-6 text-center text-sm text-slate-500">
+            Nessun reso registrato per questa data.
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {resi.map((r) => (
+              <li key={r.id} className="card flex items-center justify-between gap-3 p-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {r.distintaNumber ? (
+                      <span className="font-mono text-xs font-semibold text-brand-700">{r.distintaNumber}</span>
+                    ) : null}
+                    <span className="font-medium text-slate-800">{r.customer.name}</span>
+                    <Badge tone="purple">Reso</Badge>
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {r.address ? `${r.address.city} (${r.address.province}) · ` : ""}
+                    {[
+                      r.resiCount != null ? `${r.resiCount} resi` : null,
+                      r.pallets != null ? `${r.pallets} plt` : null,
+                      r.colli != null ? `${r.colli} colli` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || "—"}
+                    {r.notes ? ` · ${r.notes}` : ""}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Link href={`/resi/${r.id}/modifica`} className="btn-secondary">Modifica</Link>
+                  <form action={deleteReso}>
+                    <input type="hidden" name="id" value={r.id} />
+                    <input type="hidden" name="redirectTo" value={redirectTo} />
+                    <ConfirmButton variant="danger" className="px-2 py-1" confirm="Eliminare questo reso?">
+                      ✕
+                    </ConfirmButton>
+                  </form>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

@@ -4,25 +4,39 @@ import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { createTrailerLog, deleteTrailerLog } from "@/features/trailer-logs/actions";
 import { listEurosardaDrivers } from "@/features/drivers/queries";
 import { prisma } from "@/lib/db";
-import { formatDateIt, todayInputValue, parseDateOnly, isValidDateInput } from "@/lib/dates";
+import {
+  formatDateIt,
+  todayInputValue,
+  addDaysInput,
+  parseDateOnly,
+  isValidDateInput,
+} from "@/lib/dates";
 
 export default async function AutistiEurosardaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; error?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; driverId?: string; error?: string }>;
 }) {
-  const { date, error } = await searchParams;
-  const selectedDate = date && isValidDateInput(date) ? date : todayInputValue();
+  const sp = await searchParams;
+  // Default: ultimi 30 giorni.
+  const from = sp.from && isValidDateInput(sp.from) ? sp.from : addDaysInput(todayInputValue(), -30);
+  const to = sp.to && isValidDateInput(sp.to) ? sp.to : todayInputValue();
+  const driverId = sp.driverId || "";
 
   const [logs, drivers] = await Promise.all([
     prisma.trailerLog.findMany({
-      // Solo registrazioni di autisti con flag "Autista Eurosarda" attivo.
-      where: { logDate: parseDateOnly(selectedDate), driver: { isEurosarda: true } },
+      where: {
+        logDate: { gte: parseDateOnly(from), lte: parseDateOnly(to) },
+        driver: { isEurosarda: true },
+        ...(driverId ? { driverId } : {}),
+      },
       include: { driver: { select: { name: true } } },
-      orderBy: { createdAt: "asc" },
+      orderBy: [{ logDate: "desc" }, { createdAt: "asc" }],
     }),
     listEurosardaDrivers(),
   ]);
+
+  const backParams = `from=${from}&to=${to}${driverId ? `&driverId=${driverId}` : ""}`;
 
   type Row = (typeof logs)[number];
   const columns: Column<Row>[] = [
@@ -36,7 +50,7 @@ export default async function AutistiEurosardaPage({
       cell: (l) => (
         <form action={deleteTrailerLog}>
           <input type="hidden" name="id" value={l.id} />
-          <input type="hidden" name="date" value={selectedDate} />
+          <input type="hidden" name="back" value={backParams} />
           <ConfirmButton variant="danger" confirm="Eliminare questa registrazione?">
             Elimina
           </ConfirmButton>
@@ -49,16 +63,32 @@ export default async function AutistiEurosardaPage({
     <div>
       <PageHeader
         title="Autisti Eurosarda"
-        description="Registro manuale: semirimorchio agganciato in porto e servizio effettuato"
+        description="Registro semirimorchi agganciati in porto e servizi effettuati"
       />
 
-      {/* Ricerca per data */}
-      <form method="get" className="mb-4 flex flex-wrap items-end gap-2">
+      {/* Filtri: autista + intervallo giorni */}
+      <form method="get" className="card mb-4 flex flex-wrap items-end gap-3 p-3">
         <div>
-          <label className="field-label">Giorno</label>
-          <input type="date" name="date" defaultValue={selectedDate} className="field-input w-auto" />
+          <label className="field-label">Autista</label>
+          <select name="driverId" defaultValue={driverId} className="field-input w-auto">
+            <option value="">Tutti</option>
+            {drivers.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
         </div>
-        <button type="submit" className="btn-secondary">Vai al giorno</button>
+        <div>
+          <label className="field-label">Da</label>
+          <input type="date" name="from" defaultValue={from} className="field-input w-auto" />
+        </div>
+        <div>
+          <label className="field-label">A</label>
+          <input type="date" name="to" defaultValue={to} className="field-input w-auto" />
+        </div>
+        <div className="flex gap-2">
+          <button type="submit" className="btn-primary">Filtra</button>
+          <a href="/autisti-eurosarda" className="btn-secondary">Azzera</a>
+        </div>
       </form>
 
       {drivers.length === 0 ? (
@@ -72,7 +102,7 @@ export default async function AutistiEurosardaPage({
       <form action={createTrailerLog} className="card mb-4 flex flex-wrap items-end gap-3 p-4">
         <div>
           <label className="field-label">Giorno *</label>
-          <input type="date" name="logDate" defaultValue={selectedDate} required className="field-input w-auto" />
+          <input type="date" name="logDate" defaultValue={todayInputValue()} required className="field-input w-auto" />
         </div>
         <div>
           <label className="field-label">Autista *</label>
@@ -94,21 +124,21 @@ export default async function AutistiEurosardaPage({
         <button type="submit" className="btn-primary">Registra</button>
       </form>
 
-      {error === "campi" ? (
+      {sp.error === "campi" ? (
         <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           Compila tutti i campi (giorno, autista, targa, servizio).
         </p>
       ) : null}
 
       <h2 className="mb-2 text-base font-semibold text-slate-900">
-        Registrazioni del {formatDateIt(parseDateOnly(selectedDate))} ({logs.length})
+        Registrazioni dal {formatDateIt(parseDateOnly(from))} al {formatDateIt(parseDateOnly(to))} ({logs.length})
       </h2>
       <DataTable
         columns={columns}
         rows={logs}
         empty={{
           title: "Nessuna registrazione",
-          description: "Nessun aggancio registrato per questa data.",
+          description: "Nessun aggancio registrato nel periodo con questi filtri.",
         }}
       />
     </div>

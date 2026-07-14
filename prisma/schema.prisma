@@ -80,6 +80,7 @@ model Customer {
   addresses        Address[]
   pickups          Pickup[]
   recurringPickups RecurringPickup[]
+  resi             Reso[]
 
   @@index([name])
 }
@@ -102,6 +103,7 @@ model Address {
   customer         Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
   pickups          Pickup[]
   recurringPickups RecurringPickup[]
+  resi             Reso[]
 
   @@index([customerId])
   @@index([city])
@@ -248,6 +250,28 @@ model Route {
 
   @@index([routeDate])
   @@index([status])
+}
+
+// Reso: uscita per sola consegna di resi al cliente (nessun ritiro associato).
+// Registrato in pianificazione con la sua "distinta" al posto del numero presa.
+model Reso {
+  id             String   @id @default(cuid())
+  distintaNumber String? // numero distinta
+  resoDate       DateTime @db.Date
+  customerId     String
+  addressId      String?
+  resiCount      Int? // resi consegnati al cliente
+  pallets        Int?
+  colli          Int?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  address  Address? @relation(fields: [addressId], references: [id], onDelete: SetNull)
+
+  @@index([resoDate])
+  @@index([customerId])
 }
 
 // Registro manuale "Autisti Eurosarda": semirimorchio agganciato in porto

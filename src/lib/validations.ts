@@ -166,6 +166,22 @@ export const pickupSchema = z.object({
 export type PickupInput = z.infer<typeof pickupSchema>;
 
 // ---------------------------------------------------------------------------
+// Reso (consegna resi al cliente, senza ritiro)
+// ---------------------------------------------------------------------------
+
+export const resoSchema = z.object({
+  distintaNumber: optionalString,
+  resoDate: dateOnly,
+  customerId: requiredString,
+  addressId: optionalString,
+  resiCount: optionalInt,
+  pallets: optionalInt,
+  colli: optionalInt,
+  notes: optionalString,
+});
+export type ResoInput = z.infer<typeof resoSchema>;
+
+// ---------------------------------------------------------------------------
 // RecurringPickup
 // ---------------------------------------------------------------------------
 
