@@ -71,6 +71,38 @@ export async function upsertPickup(
   redirect("/prese");
 }
 
+/** Numero >= 0 o null da un campo form (vuoto = null). */
+function optNum(formData: FormData, key: string, integer = false): number | null {
+  const raw = ((formData.get(key) as string | null) ?? "").trim().replace(",", ".");
+  if (!raw) return null;
+  const n = Number(raw);
+  if (Number.isNaN(n) || n < 0) return null;
+  return integer ? Math.round(n) : n;
+}
+
+/** Modifica rapida dei quantitativi di una presa dalla sezione giri. */
+export async function updatePickupQuantities(formData: FormData): Promise<void> {
+  const id = formData.get("id") as string;
+  const redirectTo = (formData.get("redirectTo") as string) || "/pianificazione";
+  if (!id) return;
+
+  await prisma.pickup.update({
+    where: { id },
+    data: {
+      pallets: optNum(formData, "pallets", true),
+      loadingMeters: optNum(formData, "loadingMeters"),
+      colli: optNum(formData, "colli", true),
+      weightKg: optNum(formData, "weightKg"),
+      volumeM3: optNum(formData, "volumeM3"),
+    },
+  });
+
+  revalidatePath("/pianificazione");
+  revalidatePath("/dashboard");
+  revalidatePath("/prese");
+  redirect(redirectTo);
+}
+
 /** Imposta rapidamente la fascia operativa di una presa (dalla pianificazione). */
 export async function setPickupTimeWindow(formData: FormData): Promise<void> {
   const pickupId = formData.get("pickupId") as string;
@@ -95,6 +127,7 @@ export async function setPickupTimeWindow(formData: FormData): Promise<void> {
  */
 export async function cancelPickup(formData: FormData): Promise<void> {
   const id = formData.get("id") as string;
+  const redirectTo = (formData.get("redirectTo") as string) || "/prese";
   if (!id) return;
 
   const pickup = await prisma.pickup.findUnique({
@@ -121,5 +154,5 @@ export async function cancelPickup(formData: FormData): Promise<void> {
   revalidatePath("/prese");
   revalidatePath("/pianificazione");
   revalidatePath("/dashboard");
-  redirect("/prese");
+  redirect(redirectTo);
 }

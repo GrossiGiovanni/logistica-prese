@@ -28,6 +28,7 @@ export function ResoForm({
   const [customerId, setCustomerId] = useState(reso?.customerId ?? "");
   const selectedCustomer = customers.find((c) => c.id === customerId);
   const addresses = selectedCustomer?.addresses ?? [];
+  const [newCustomer, setNewCustomer] = useState(false);
 
   return (
     <form action={formAction} className="space-y-4">
@@ -52,20 +53,34 @@ export function ResoForm({
             className="field-input"
           />
         </Field>
-        <Field label="Cliente *" htmlFor="customerId" error={errors?.customerId}>
-          <select
-            id="customerId"
-            name="customerId"
-            value={customerId}
-            onChange={(e) => setCustomerId(e.target.value)}
-            required
-            className="field-input"
-          >
-            <option value="" disabled>Seleziona cliente…</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+        <Field label="Cliente *" htmlFor="customerId" error={errors?.customerId} full>
+          {!reso ? (
+            <label className="mb-1 flex items-center gap-2 text-xs text-slate-500">
+              <input
+                type="checkbox"
+                checked={newCustomer}
+                onChange={(e) => setNewCustomer(e.target.checked)}
+              />
+              Nuovo cliente (crea al volo)
+            </label>
+          ) : null}
+          {newCustomer ? (
+            <input name="newCustomerName" placeholder="Nome nuovo cliente" required className="field-input" />
+          ) : (
+            <select
+              id="customerId"
+              name="customerId"
+              value={customerId}
+              onChange={(e) => setCustomerId(e.target.value)}
+              required
+              className="field-input"
+            >
+              <option value="" disabled>Seleziona cliente…</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          )}
         </Field>
         <Field label="Indirizzo" htmlFor="addressId" error={errors?.addressId}>
           <select

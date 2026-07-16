@@ -183,7 +183,11 @@ export async function confirmImport(preview: ImportPreview): Promise<ImportResul
         continue;
       }
 
-      if (aggiornamento) {
+      // Aggiornamento "consuntivo" (peso/volume/colli + dati mancanti) SENZA
+      // toccare stato/data/fascia/giro: usato in modalità aggiornamento e anche,
+      // in modalità operativa, per le prese già associate a un giro.
+      const soloConsuntivo = aggiornamento || target._count.routeStops > 0;
+      if (soloConsuntivo) {
         await prisma.pickup.update({
           where: { id: target.id },
           data: {

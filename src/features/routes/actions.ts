@@ -21,28 +21,31 @@ function revalidateRoutes(routeId?: string) {
  */
 export async function recalcRouteKm(routeId: string): Promise<void> {
   try {
+    const addrSelect = {
+      select: {
+        street: true,
+        city: true,
+        province: true,
+        postalCode: true,
+        lat: true,
+        lng: true,
+      },
+    } as const;
     const stops = await prisma.routeStop.findMany({
       where: { routeId },
       orderBy: { sequence: "asc" },
       select: {
-        pickup: {
-          select: {
-            address: {
-              select: {
-                street: true,
-                city: true,
-                province: true,
-                postalCode: true,
-                lat: true,
-                lng: true,
-              },
-            },
-          },
-        },
+        pickup: { select: { address: addrSelect } },
+        reso: { select: { address: addrSelect } },
       },
     });
     // Waypoint = coordinate salvate (le stesse dei pin mappa), testo in riserva.
-    const result = await computeRouteKm(stops.map((s) => s.pickup.address));
+    // Include sia i ritiri sia i resi (entrambi sono tappe fisiche); salta le
+    // fermate prive di indirizzo (es. reso senza indirizzo).
+    const addresses = stops
+      .map((s) => s.pickup?.address ?? s.reso?.address)
+      .filter((a): a is NonNullable<typeof a> => a != null);
+    const result = await computeRouteKm(addresses);
     // Salva solo se abbiamo un km valido o se il giro è vuoto (km=null corretto).
     // In caso di chiave assente o errore API NON sovrascrive l'ultimo km buono.
     if (result.km != null || result.reason === "no_stops") {
@@ -157,16 +160,15 @@ export async function deleteRoute(formData: FormData): Promise<void> {
     },
   });
 
+  const plannedPickups = stops
+    .map((s) => s.pickup)
+    .filter((p): p is NonNullable<typeof p> => p != null && p.status === "PLANNED");
+
   await prisma.$transaction([
     prisma.route.delete({ where: { id } }), // cascade cancella i RouteStop
-    ...stops
-      .filter((s) => s.pickup.status === "PLANNED")
-      .map((s) =>
-        prisma.pickup.update({
-          where: { id: s.pickup.id },
-          data: { status: unplannedStatus(s.pickup) },
-        }),
-      ),
+    ...plannedPickups.map((p) =>
+      prisma.pickup.update({ where: { id: p.id }, data: { status: unplannedStatus(p) } }),
+    ),
   ]);
 
   revalidateRoutes();
@@ -258,6 +260,37 @@ export async function setPickupRoute(formData: FormData): Promise<void> {
   for (const old of oldRouteIds) {
     await recalcRouteKm(old);
   }
+
+  revalidateRoutes(routeId || undefined);
+  redirect(redirectTo);
+}
+
+/** Assegna/rimuove un reso da un giro (routeId vuoto = riporta tra i non assegnati). */
+export async function setResoRoute(formData: FormData): Promise<void> {
+  const resoId = formData.get("resoId") as string;
+  const routeId = ((formData.get("routeId") as string) || "").trim();
+  const redirectTo = (formData.get("redirectTo") as string) || "/pianificazione";
+  if (!resoId) return;
+
+  const existing = await prisma.routeStop.findMany({ where: { resoId }, select: { routeId: true } });
+  const oldRouteIds = [...new Set(existing.map((s) => s.routeId))].filter((id) => id !== routeId);
+
+  if (oldRouteIds.length > 0) {
+    await prisma.routeStop.deleteMany({ where: { resoId, routeId: { in: oldRouteIds } } });
+  }
+  if (routeId && !existing.some((s) => s.routeId === routeId)) {
+    const last = await prisma.routeStop.findFirst({
+      where: { routeId },
+      orderBy: { sequence: "desc" },
+      select: { sequence: true },
+    });
+    await prisma.routeStop.create({
+      data: { routeId, resoId, sequence: (last?.sequence ?? 0) + 1 },
+    });
+  }
+
+  if (routeId) await recalcRouteKm(routeId);
+  for (const old of oldRouteIds) await recalcRouteKm(old);
 
   revalidateRoutes(routeId || undefined);
   redirect(redirectTo);

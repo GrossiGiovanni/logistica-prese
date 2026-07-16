@@ -1,8 +1,8 @@
 import { PageHeader } from "@/components/ui/PageHeader";
-import { DataTable, type Column } from "@/components/tables/DataTable";
-import { ConfirmButton } from "@/components/ui/ConfirmButton";
-import { createTrailerLog, deleteTrailerLog } from "@/features/trailer-logs/actions";
+import { createTrailerLog } from "@/features/trailer-logs/actions";
+import { TrailerLogRow } from "@/features/trailer-logs/TrailerLogRow";
 import { listEurosardaDrivers } from "@/features/drivers/queries";
+import { toDateInputValue } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import {
   formatDateIt,
@@ -37,27 +37,7 @@ export default async function AutistiEurosardaPage({
   ]);
 
   const backParams = `from=${from}&to=${to}${driverId ? `&driverId=${driverId}` : ""}`;
-
-  type Row = (typeof logs)[number];
-  const columns: Column<Row>[] = [
-    { header: "Giorno", cell: (l) => <span className="whitespace-nowrap">{formatDateIt(l.logDate)}</span> },
-    { header: "Autista", cell: (l) => <span className="font-medium text-slate-800">{l.driver.name}</span> },
-    { header: "Targa semirimorchio", cell: (l) => <span className="font-mono">{l.trailerPlate}</span> },
-    { header: "Servizio effettuato", cell: (l) => l.service },
-    {
-      header: "",
-      className: "text-right",
-      cell: (l) => (
-        <form action={deleteTrailerLog}>
-          <input type="hidden" name="id" value={l.id} />
-          <input type="hidden" name="back" value={backParams} />
-          <ConfirmButton variant="danger" confirm="Eliminare questa registrazione?">
-            Elimina
-          </ConfirmButton>
-        </form>
-      ),
-    },
-  ];
+  const driverOptions = drivers.map((d) => ({ id: d.id, name: d.name }));
 
   return (
     <div>
@@ -133,14 +113,44 @@ export default async function AutistiEurosardaPage({
       <h2 className="mb-2 text-base font-semibold text-slate-900">
         Registrazioni dal {formatDateIt(parseDateOnly(from))} al {formatDateIt(parseDateOnly(to))} ({logs.length})
       </h2>
-      <DataTable
-        columns={columns}
-        rows={logs}
-        empty={{
-          title: "Nessuna registrazione",
-          description: "Nessun aggancio registrato nel periodo con questi filtri.",
-        }}
-      />
+      {logs.length === 0 ? (
+        <div className="card px-4 py-6 text-center text-sm text-slate-500">
+          Nessun aggancio registrato nel periodo con questi filtri.
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-slate-200">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-left text-slate-500">
+              <tr>
+                <th className="px-3 py-2">Giorno</th>
+                <th className="px-3 py-2">Autista</th>
+                <th className="px-3 py-2">Targa semirimorchio</th>
+                <th className="px-3 py-2">Servizio effettuato</th>
+                <th className="px-3 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((l) => (
+                <TrailerLogRow
+                  key={l.id}
+                  drivers={driverOptions}
+                  back={backParams}
+                  dateInput={toDateInputValue(l.logDate)}
+                  log={{
+                    id: l.id,
+                    logDate: toDateInputValue(l.logDate),
+                    driverName: l.driver.name,
+                    driverId: l.driverId,
+                    trailerPlate: l.trailerPlate,
+                    service: l.service,
+                    dayLabel: formatDateIt(l.logDate),
+                  }}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

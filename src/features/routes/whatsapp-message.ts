@@ -14,7 +14,15 @@ type StopLite = {
     rawNotes: string | null;
     customer: { name: string };
     address: { street: string; city: string; province: string };
-  };
+  } | null;
+  reso: {
+    distintaNumber: string | null;
+    resiCount: number | null;
+    pallets: number | null;
+    notes: string | null;
+    customer: { name: string };
+    address: { street: string; city: string; province: string } | null;
+  } | null;
 };
 
 export type WhatsappRoute = {
@@ -45,21 +53,36 @@ export function buildWhatsappMessage(route: WhatsappRoute): string {
   if (route.km != null) lines.push(`Km totali: ${route.km} km`);
   lines.push(`Partenza: ${WAREHOUSE_ADDRESS}`);
   lines.push("");
-  lines.push(`PRESE (${route.stops.length}):`);
+  lines.push(`FERMATE (${route.stops.length}):`);
 
   route.stops.forEach((s, i) => {
-    const p = s.pickup;
-    const num = p.pickupNumber ? `[${p.pickupNumber}] ` : "";
-    lines.push(`${i + 1}) ${num}${p.customer.name}`);
-    lines.push(`   ${p.address.street}, ${p.address.city} (${p.address.province})`);
-    const meta = [
-      timeWindowLabels[p.timeWindow],
-      p.pallets != null ? `${p.pallets} pallet` : null,
-    ]
-      .filter(Boolean)
-      .join(" - ");
-    if (meta) lines.push(`   ${meta}`);
-    if (p.rawNotes) lines.push(`   Note: ${p.rawNotes}`);
+    if (s.pickup) {
+      const p = s.pickup;
+      const num = p.pickupNumber ? `[${p.pickupNumber}] ` : "";
+      lines.push(`${i + 1}) RITIRO ${num}${p.customer.name}`);
+      lines.push(`   ${p.address.street}, ${p.address.city} (${p.address.province})`);
+      const meta = [
+        timeWindowLabels[p.timeWindow],
+        p.pallets != null ? `${p.pallets} pallet` : null,
+      ]
+        .filter(Boolean)
+        .join(" - ");
+      if (meta) lines.push(`   ${meta}`);
+      if (p.rawNotes) lines.push(`   Note: ${p.rawNotes}`);
+    } else if (s.reso) {
+      const r = s.reso;
+      const num = r.distintaNumber ? `[${r.distintaNumber}] ` : "";
+      lines.push(`${i + 1}) RESO ${num}${r.customer.name}`);
+      if (r.address) lines.push(`   ${r.address.street}, ${r.address.city} (${r.address.province})`);
+      const meta = [
+        r.resiCount != null ? `${r.resiCount} resi` : null,
+        r.pallets != null ? `${r.pallets} pallet` : null,
+      ]
+        .filter(Boolean)
+        .join(" - ");
+      if (meta) lines.push(`   ${meta}`);
+      if (r.notes) lines.push(`   Note: ${r.notes}`);
+    }
   });
 
   lines.push("");

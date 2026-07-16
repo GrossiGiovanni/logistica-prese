@@ -133,8 +133,16 @@ export function getPickupWarnings(pickup: PickupLike): PickupWarning[] {
 type RouteWithRelations = Route & {
   vehicle: Vehicle | null;
   driver: Driver | null;
-  stops: (RouteStop & { pickup: PickupLike })[];
+  // Una fermata è una presa (ritiro) oppure un reso (pickup null).
+  stops: (RouteStop & { pickup: PickupLike | null })[];
 };
+
+/** Solo le prese (ritiri) del giro: i resi non entrano nei totali di carico. */
+function routePickups(route: RouteWithRelations): PickupLike[] {
+  return route.stops
+    .map((s) => s.pickup)
+    .filter((p): p is PickupLike => p != null);
+}
 
 /**
  * Pallet-equivalenti di una presa: usa i pallet se presenti, altrimenti li ricava
@@ -161,23 +169,23 @@ export function pickupMetersEquivalent(p: {
 /** Totale pallet del giro (pallet dichiarati o convertiti dai metri lineari). */
 export function routeTotalPallets(route: RouteWithRelations): number {
   return Math.round(
-    route.stops.reduce((sum, stop) => sum + pickupPalletEquivalent(stop.pickup), 0),
+    routePickups(route).reduce((sum, p) => sum + pickupPalletEquivalent(p), 0),
   );
 }
 
 /** Somma dei metri cubi delle prese del giro. */
 export function routeTotalVolume(route: RouteWithRelations): number {
-  return route.stops.reduce((sum, stop) => sum + (stop.pickup.volumeM3 ?? 0), 0);
+  return routePickups(route).reduce((sum, p) => sum + (p.volumeM3 ?? 0), 0);
 }
 
 /** Somma del peso (kg) delle prese del giro. */
 export function routeTotalWeight(route: RouteWithRelations): number {
-  return route.stops.reduce((sum, stop) => sum + (stop.pickup.weightKg ?? 0), 0);
+  return routePickups(route).reduce((sum, p) => sum + (p.weightKg ?? 0), 0);
 }
 
 /** Somma dei metri lineari (MTL) delle prese del giro. */
 export function routeTotalLoadingMeters(route: RouteWithRelations): number {
-  return route.stops.reduce((sum, stop) => sum + (stop.pickup.loadingMeters ?? 0), 0);
+  return routePickups(route).reduce((sum, p) => sum + (p.loadingMeters ?? 0), 0);
 }
 
 // Pallet EUR 80×120 cm: in un mezzo largo ~2,4 m stanno 2 pallet affiancati
@@ -190,8 +198,13 @@ export const PALLETS_PER_METER = 1 / METERS_PER_PALLET; // 2,5
  * arrotondato al metro. Es. 14 pallet × 0,4 = 5,6 → 6 m.
  */
 export function routeOccupiedMeters(route: RouteWithRelations): number {
-  const m = route.stops.reduce((sum, stop) => sum + pickupMetersEquivalent(stop.pickup), 0);
+  const m = routePickups(route).reduce((sum, p) => sum + pickupMetersEquivalent(p), 0);
   return Math.round(m);
+}
+
+/** Numero di resi (fermate senza presa) nel giro. */
+export function routeResiCount(route: RouteWithRelations): number {
+  return route.stops.filter((s) => s.pickup == null).length;
 }
 
 /** True se il giro usa una motrice (mezzo costoso). */
@@ -223,12 +236,12 @@ export function getRouteWarnings(route: RouteWithRelations): RouteWarning[] {
   }
 
   // Almeno una presa in una fascia incompatibile col giro.
-  const shiftMismatch = route.stops.some(
-    (stop) => !pickupFitsShift(stop.pickup.timeWindow, route.shift),
+  const shiftMismatch = routePickups(route).some(
+    (p) => !pickupFitsShift(p.timeWindow, route.shift),
   );
   if (shiftMismatch) warnings.push("pickup_shift_mismatch");
 
-  const hasUnvalidated = route.stops.some((stop) => hasMissingData(stop.pickup));
+  const hasUnvalidated = routePickups(route).some((p) => hasMissingData(p));
   if (hasUnvalidated) warnings.push("contains_unvalidated_pickups");
 
   return warnings;

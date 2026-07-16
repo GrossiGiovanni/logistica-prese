@@ -16,6 +16,14 @@ export const routeInclude = {
           },
         },
       },
+      reso: {
+        include: {
+          customer: { select: { id: true, name: true } },
+          address: {
+            select: { id: true, label: true, street: true, city: true, province: true, lat: true, lng: true },
+          },
+        },
+      },
     },
   },
 } satisfies Prisma.RouteInclude;

@@ -13,15 +13,18 @@ import {
   moveStop,
   removePickupFromRoute,
   assignPickupToRoute,
+  setResoRoute,
   setRouteStatus,
   deleteRoute,
   recalculateRouteKm,
 } from "@/features/routes/actions";
+import { StopQuantityEdit } from "@/features/routes/StopQuantityEdit";
 import {
   routeTotalPallets,
   routeTotalVolume,
   routeTotalWeight,
   routeOccupiedMeters,
+  routeResiCount,
   pickupPalletEquivalent,
   getRouteWarnings,
   hasMissingData,
@@ -72,12 +75,17 @@ export default async function GiroDettaglioPage({
   const totalVolume = routeTotalVolume(route);
   const totalWeight = routeTotalWeight(route);
   const totalMeters = routeOccupiedMeters(route);
+  const totalResi = routeResiCount(route);
   const totalCost = routeTotalCost(route);
   const warnings = getRouteWarnings(route);
   const redirectTo = `/giri/${route.id}`;
 
   // Waypoint = coordinate salvate (le stesse del calcolo km), testo in riserva.
-  const stopAddresses = route.stops.map((s) => pointParam(s.pickup.address));
+  // Include ritiri e resi (entrambi tappe); salta le fermate senza indirizzo.
+  const stopAddresses = route.stops
+    .map((s) => s.pickup?.address ?? s.reso?.address)
+    .filter((a): a is NonNullable<typeof a> => a != null)
+    .map((a) => pointParam(a));
   const mapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
 
   // WhatsApp: visibile solo con autista WhatsApp-abilitato e almeno una presa.
@@ -123,6 +131,9 @@ export default async function GiroDettaglioPage({
             {totalVolume > 0 ? ` · ${totalVolume.toFixed(1)} m³` : ""}
             {totalWeight > 0 ? ` · ${totalWeight.toFixed(0)} kg` : ""}
           </span>
+          {totalResi > 0 ? (
+            <span className="ml-2 text-slate-500">· Resi: <b className="text-slate-700">{totalResi}</b></span>
+          ) : null}
         </div>
         <div>
           <span className="text-slate-500">Orari: </span>
@@ -197,64 +208,107 @@ export default async function GiroDettaglioPage({
               </div>
             ) : (
               <ol className="space-y-2">
-                {route.stops.map((stop, idx) => (
-                  <li key={stop.id} className="card flex items-start gap-3 p-3">
-                    <div className="flex flex-col items-center gap-1 pt-1">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-50 text-xs font-bold text-brand-700">
-                        {idx + 1}
-                      </span>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {stop.pickup.pickupNumber ? (
-                          <span className="font-mono text-xs font-semibold text-brand-700">
-                            {stop.pickup.pickupNumber}
-                          </span>
-                        ) : null}
-                        <span className="font-medium text-slate-800">
-                          {stop.pickup.customer.name}
+                {route.stops.map((stop, idx) => {
+                  const p = stop.pickup;
+                  const reso = stop.reso;
+                  return (
+                    <li key={stop.id} className="card flex items-start gap-3 p-3">
+                      <div className="flex flex-col items-center gap-1 pt-1">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-50 text-xs font-bold text-brand-700">
+                          {idx + 1}
                         </span>
-                        <Badge tone="slate">{timeWindowLabels[stop.pickup.timeWindow]}</Badge>
-                        {stop.pickup.requiresMotrice ? <Badge tone="purple">Motrice</Badge> : null}
-                        {stop.pickup.requiresTailLift ? <Badge tone="blue">Sponda</Badge> : null}
-                        {hasMissingData(stop.pickup) ? <MissingDataBadge /> : null}
                       </div>
-                      <div className="text-xs text-slate-500">
-                        {stop.pickup.address.street}, {stop.pickup.address.city} ({stop.pickup.address.province})
-                        {" · "}
-                        {Math.round(pickupPalletEquivalent(stop.pickup))} plt
-                        {stop.pickup.pallets == null && stop.pickup.loadingMeters != null
-                          ? ` (da ${stop.pickup.loadingMeters} mtl)`
-                          : ""}
-                        {" · "}
-                        {priorityLabels[stop.pickup.priority]}
+                      <div className="min-w-0 flex-1">
+                        {p ? (
+                          <>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {p.pickupNumber ? (
+                                <span className="font-mono text-xs font-semibold text-brand-700">{p.pickupNumber}</span>
+                              ) : null}
+                              <span className="font-medium text-slate-800">{p.customer.name}</span>
+                              <Badge tone="slate">{timeWindowLabels[p.timeWindow]}</Badge>
+                              {p.requiresMotrice ? <Badge tone="purple">Motrice</Badge> : null}
+                              {p.requiresTailLift ? <Badge tone="blue">Sponda</Badge> : null}
+                              {hasMissingData(p) ? <MissingDataBadge /> : null}
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              {p.address.street}, {p.address.city} ({p.address.province})
+                              {" · "}
+                              {Math.round(pickupPalletEquivalent(p))} plt
+                              {p.colli != null ? ` · ${p.colli} colli` : ""}
+                              {p.weightKg != null ? ` · ${p.weightKg} kg` : ""}
+                              {p.volumeM3 != null ? ` · ${p.volumeM3} m³` : ""}
+                            </div>
+                            {p.rawNotes ? (
+                              <div className="mt-1 text-xs italic text-slate-400">{p.rawNotes}</div>
+                            ) : null}
+                            <StopQuantityEdit
+                              pickupId={p.id}
+                              redirectTo={redirectTo}
+                              values={{
+                                pallets: p.pallets,
+                                loadingMeters: p.loadingMeters,
+                                colli: p.colli,
+                                weightKg: p.weightKg,
+                                volumeM3: p.volumeM3,
+                              }}
+                            />
+                          </>
+                        ) : reso ? (
+                          <>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {reso.distintaNumber ? (
+                                <span className="font-mono text-xs font-semibold text-brand-700">{reso.distintaNumber}</span>
+                              ) : null}
+                              <span className="font-medium text-slate-800">{reso.customer.name}</span>
+                              <Badge tone="purple">Reso</Badge>
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              {reso.address ? `${reso.address.street}, ${reso.address.city} (${reso.address.province}) · ` : ""}
+                              {[
+                                reso.resiCount != null ? `${reso.resiCount} resi` : null,
+                                reso.pallets != null ? `${reso.pallets} plt` : null,
+                                reso.colli != null ? `${reso.colli} colli` : null,
+                              ].filter(Boolean).join(" · ") || "—"}
+                            </div>
+                            {reso.notes ? (
+                              <div className="mt-1 text-xs italic text-slate-400">{reso.notes}</div>
+                            ) : null}
+                          </>
+                        ) : null}
                       </div>
-                      {stop.pickup.rawNotes ? (
-                        <div className="mt-1 text-xs italic text-slate-400">{stop.pickup.rawNotes}</div>
-                      ) : null}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <form action={moveStop}>
-                        <input type="hidden" name="routeId" value={route.id} />
-                        <input type="hidden" name="stopId" value={stop.id} />
-                        <input type="hidden" name="direction" value="up" />
-                        <button type="submit" disabled={idx === 0} className="btn-secondary px-2 py-1" title="Su">↑</button>
-                      </form>
-                      <form action={moveStop}>
-                        <input type="hidden" name="routeId" value={route.id} />
-                        <input type="hidden" name="stopId" value={stop.id} />
-                        <input type="hidden" name="direction" value="down" />
-                        <button type="submit" disabled={idx === route.stops.length - 1} className="btn-secondary px-2 py-1" title="Giù">↓</button>
-                      </form>
-                      <form action={removePickupFromRoute}>
-                        <input type="hidden" name="routeId" value={route.id} />
-                        <input type="hidden" name="pickupId" value={stop.pickup.id} />
-                        <input type="hidden" name="redirectTo" value={redirectTo} />
-                        <ConfirmButton variant="danger" className="px-2 py-1">Rimuovi</ConfirmButton>
-                      </form>
-                    </div>
-                  </li>
-                ))}
+                      <div className="flex shrink-0 items-center gap-1">
+                        <form action={moveStop}>
+                          <input type="hidden" name="routeId" value={route.id} />
+                          <input type="hidden" name="stopId" value={stop.id} />
+                          <input type="hidden" name="direction" value="up" />
+                          <button type="submit" disabled={idx === 0} className="btn-secondary px-2 py-1" title="Su">↑</button>
+                        </form>
+                        <form action={moveStop}>
+                          <input type="hidden" name="routeId" value={route.id} />
+                          <input type="hidden" name="stopId" value={stop.id} />
+                          <input type="hidden" name="direction" value="down" />
+                          <button type="submit" disabled={idx === route.stops.length - 1} className="btn-secondary px-2 py-1" title="Giù">↓</button>
+                        </form>
+                        {p ? (
+                          <form action={removePickupFromRoute}>
+                            <input type="hidden" name="routeId" value={route.id} />
+                            <input type="hidden" name="pickupId" value={p.id} />
+                            <input type="hidden" name="redirectTo" value={redirectTo} />
+                            <ConfirmButton variant="danger" className="px-2 py-1">Rimuovi</ConfirmButton>
+                          </form>
+                        ) : reso ? (
+                          <form action={setResoRoute}>
+                            <input type="hidden" name="resoId" value={reso.id} />
+                            <input type="hidden" name="routeId" value="" />
+                            <input type="hidden" name="redirectTo" value={redirectTo} />
+                            <ConfirmButton variant="danger" className="px-2 py-1">Rimuovi</ConfirmButton>
+                          </form>
+                        ) : null}
+                      </div>
+                    </li>
+                  );
+                })}
               </ol>
             )}
           </section>

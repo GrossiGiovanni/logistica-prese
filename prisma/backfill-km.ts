@@ -13,14 +13,17 @@ async function main() {
       vehicle: { select: { name: true } },
       stops: {
         orderBy: { sequence: "asc" },
-        include: { pickup: { include: { address: true } } },
+        include: { pickup: { include: { address: true } }, reso: { include: { address: true } } },
       },
     },
   });
 
   for (const r of routes) {
     if (r.stops.length === 0) continue;
-    const result = await computeRouteKm(r.stops.map((s) => s.pickup.address));
+    const addresses = r.stops
+      .map((s) => s.pickup?.address ?? s.reso?.address)
+      .filter((a): a is NonNullable<typeof a> => a != null);
+    const result = await computeRouteKm(addresses);
     if (result.km != null) {
       await prisma.route.update({ where: { id: r.id }, data: { km: result.km } });
       console.log(`  ${r.vehicle?.name ?? "-"}: ${result.km} km`);

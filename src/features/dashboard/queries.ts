@@ -36,7 +36,14 @@ export async function getDailyStats(dateStr: string) {
   const usedVehicleIds = new Set(
     routes.map((r) => r.vehicleId).filter((v): v is string => Boolean(v)),
   );
-  const motriciUsed = routes.filter((r) => r.vehicle?.vehicleType === "MOTRICE").length;
+  // Conta i MEZZI motrice distinti usati, non i giri: una stessa motrice su più
+  // giri non deve essere contata due volte.
+  const motriciUsed = new Set(
+    routes
+      .filter((r) => r.vehicle?.vehicleType === "MOTRICE")
+      .map((r) => r.vehicleId)
+      .filter((v): v is string => Boolean(v)),
+  ).size;
 
   return {
     pickups,

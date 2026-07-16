@@ -90,11 +90,12 @@ export default async function PianificazionePlusPage({
 
   // Percorsi (polyline) dei giri con fermate, in parallelo.
   const polylines = await Promise.all(
-    routesRaw.map((r) =>
-      r.stops.length > 0
-        ? fetchRoutePolyline(r.stops.map((s) => s.pickup.address))
-        : Promise.resolve(null),
-    ),
+    routesRaw.map((r) => {
+      const addresses = r.stops
+        .map((s) => s.pickup?.address ?? s.reso?.address)
+        .filter((a): a is NonNullable<typeof a> => a != null);
+      return addresses.length > 0 ? fetchRoutePolyline(addresses) : Promise.resolve(null);
+    }),
   );
 
   const routes: PlusRoute[] = routesRaw.map((r, i) => {
@@ -111,14 +112,17 @@ export default async function PianificazionePlusPage({
       warnings,
       color: COLORS[i % COLORS.length],
       polyline: polylines[i],
-      stops: r.stops.map((s) => ({
-        seq: s.sequence,
-        warnings: [
-          !pickupFitsShift(s.pickup.timeWindow, r.shift) ? "Fascia diversa dal giro" : null,
-          !hasLoadData(s.pickup) ? "Carico mancante" : null,
-        ].filter((w): w is string => w != null),
-        pickup: toPlusPickup(s.pickup, selectedDate),
-      })),
+      // Solo le fermate-presa vanno sulla lavagna (i resi non hanno marker qui).
+      stops: r.stops
+        .filter((s) => s.pickup != null)
+        .map((s) => ({
+          seq: s.sequence,
+          warnings: [
+            !pickupFitsShift(s.pickup!.timeWindow, r.shift) ? "Fascia diversa dal giro" : null,
+            !hasLoadData(s.pickup!) ? "Carico mancante" : null,
+          ].filter((w): w is string => w != null),
+          pickup: toPlusPickup(s.pickup!, selectedDate),
+        })),
     };
   });
 

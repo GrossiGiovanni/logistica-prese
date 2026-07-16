@@ -263,12 +263,15 @@ model Reso {
   resiCount      Int? // resi consegnati al cliente
   pallets        Int?
   colli          Int?
+  weightKg       Float?
+  volumeM3       Float?
   notes          String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  address  Address? @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  customer   Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  address    Address?    @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  routeStops RouteStop[]
 
   @@index([resoDate])
   @@index([customerId])
@@ -305,18 +308,23 @@ model ImportLog {
   @@index([createdAt])
 }
 
+// Fermata di un giro: una presa (ritiro) OPPURE un reso (consegna).
 model RouteStop {
   id        String   @id @default(cuid())
   routeId   String
-  pickupId  String
+  pickupId  String?
+  resoId    String?
   sequence  Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  route  Route  @relation(fields: [routeId], references: [id], onDelete: Cascade)
-  pickup Pickup @relation(fields: [pickupId], references: [id], onDelete: Cascade)
+  route  Route   @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  pickup Pickup? @relation(fields: [pickupId], references: [id], onDelete: Cascade)
+  reso   Reso?   @relation(fields: [resoId], references: [id], onDelete: Cascade)
 
   @@unique([routeId, pickupId])
+  @@unique([routeId, resoId])
   @@index([routeId])
   @@index([pickupId])
+  @@index([resoId])
 }

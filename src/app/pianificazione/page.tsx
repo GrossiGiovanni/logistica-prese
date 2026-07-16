@@ -8,7 +8,8 @@ import { DateSelector } from "@/components/ui/DateSelector";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { getDailyStats } from "@/features/dashboard/queries";
 import { listUnassignedPickups } from "@/features/pickups/queries";
-import { assignPickupToRoute, deleteRoute } from "@/features/routes/actions";
+import { assignPickupToRoute, deleteRoute, setResoRoute } from "@/features/routes/actions";
+import { cancelPickup } from "@/features/pickups/actions";
 import { deleteReso } from "@/features/resi/actions";
 import { ensureRecurringForDate } from "@/features/recurring-pickups/generate";
 import { prisma } from "@/lib/db";
@@ -61,6 +62,7 @@ export default async function PianificazionePage({
       include: {
         customer: { select: { name: true } },
         address: { select: { city: true, province: true } },
+        routeStops: { select: { route: { select: { id: true, driver: { select: { name: true } }, vehicle: { select: { name: true } } } } } },
       },
       orderBy: { createdAt: "asc" },
     }),
@@ -141,6 +143,16 @@ export default async function PianificazionePage({
                   <div className="mt-2 flex items-center gap-2">
                     <span className="text-xs text-slate-500">Fascia:</span>
                     <PickupShiftSelect pickupId={p.id} value={p.timeWindow} redirectTo={redirectTo} />
+                    <form action={cancelPickup} className="ml-auto">
+                      <input type="hidden" name="id" value={p.id} />
+                      <ConfirmButton
+                        variant="danger"
+                        className="px-2 py-1 text-xs"
+                        confirm="Eliminare definitivamente questa presa? Se servirà di nuovo andrà ricreata o reimportata."
+                      >
+                        Annulla
+                      </ConfirmButton>
+                    </form>
                   </div>
 
                   {routes.length === 0 ? (
@@ -281,7 +293,25 @@ export default async function PianificazionePage({
                       .filter(Boolean)
                       .join(" · ") || "—"}
                     {r.notes ? ` · ${r.notes}` : ""}
+                    {r.routeStops[0]?.route ? (
+                      <span className="text-slate-400">
+                        {" · "}Giro: {r.routeStops[0].route.driver?.name ?? "—"} / {r.routeStops[0].route.vehicle?.name ?? "—"}
+                      </span>
+                    ) : null}
                   </div>
+                  {routes.length > 0 ? (
+                    <form action={setResoRoute} className="mt-2 flex items-center gap-2">
+                      <input type="hidden" name="resoId" value={r.id} />
+                      <input type="hidden" name="redirectTo" value={redirectTo} />
+                      <select name="routeId" defaultValue={r.routeStops[0]?.route.id ?? ""} className="field-input w-auto py-1 text-xs">
+                        <option value="">— Non in un giro —</option>
+                        {routes.map((gr) => (
+                          <option key={gr.id} value={gr.id}>{routeLabel(gr)} · {routeShiftLabels[gr.shift]}</option>
+                        ))}
+                      </select>
+                      <button type="submit" className="btn-secondary px-2 py-1 text-xs">Assegna</button>
+                    </form>
+                  ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <Link href={`/resi/${r.id}/modifica`} className="btn-secondary">Modifica</Link>
