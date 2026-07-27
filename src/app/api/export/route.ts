@@ -1,6 +1,16 @@
 // Export Excel (.xlsx) di prese e giri, filtrabile per intervallo date.
 // /api/export?type=prese&from=YYYY-MM-DD&to=YYYY-MM-DD
 // /api/export?type=giri&from=YYYY-MM-DD&to=YYYY-MM-DD
+//
+// L'export "giri" produce un file multi-foglio:
+//   1) Riepilogo giri     — una riga per giro
+//   2) Dettaglio prese eseguite — una riga per presa (ritiro) assegnata a un giro
+//   3) Dettaglio resi     — una riga per reso assegnato a un giro (separato dalle
+//                            prese: i quantitativi dei resi NON si sommano ai ritiri)
+//   4) Costi e km         — km e costi per giro e per trazione Eurosarda
+// I fogli sono unici e filtrabili (per autista, data, cliente, mezzo, filiale):
+// nessun foglio separato per autista. In futuro si potrà aggiungere un'opzione
+// "crea fogli separati per autista" (es. ?perDriver=1).
 
 import { NextResponse, type NextRequest } from "next/server";
 import ExcelJS from "exceljs";
@@ -16,12 +26,19 @@ import {
 } from "@/lib/warnings";
 import { routeTotalCost } from "@/lib/costs";
 import { routeLabel, routeShiftLabels, pickupStatusLabels, routeStatusLabels } from "@/lib/labels";
-import { parseDateOnly, isValidDateInput, toDateInputValue, todayInputValue, addDaysInput } from "@/lib/dates";
+import { parseDateOnly, isValidDateInput, todayInputValue, addDaysInput } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
 function itDate(d: Date): string {
   return d.toLocaleDateString("it-IT", { timeZone: "UTC" });
+}
+
+/** Intestazione in grassetto su sfondo azzurro chiaro. */
+function styleHeader(ws: ExcelJS.Worksheet): void {
+  const header = ws.getRow(1);
+  header.font = { bold: true };
+  header.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDCE1F5" } };
 }
 
 export async function GET(request: NextRequest) {
@@ -35,11 +52,14 @@ export async function GET(request: NextRequest) {
   const to = isValidDateInput(sp.get("to") ?? "") ? sp.get("to")! : todayInputValue();
   const range = { gte: parseDateOnly(from), lte: parseDateOnly(to) };
 
+  const branch = await prisma.branch.findUnique({ where: { id: branchId }, select: { name: true } });
+  const branchName = branch?.name ?? "—";
+
   const wb = new ExcelJS.Workbook();
   wb.creator = "Logistica Prese — Eurosarda";
-  const ws = wb.addWorksheet(type === "giri" ? "Giri" : "Prese");
 
   if (type === "prese") {
+    const ws = wb.addWorksheet("Prese");
     const pickups = await prisma.pickup.findMany({
       where: { branchId, pickupDate: range, status: { not: "CANCELLED" } },
       include: {
@@ -59,6 +79,7 @@ export async function GET(request: NextRequest) {
     ws.columns = [
       { header: "N. presa", key: "num", width: 18 },
       { header: "Data", key: "date", width: 12 },
+      { header: "Filiale", key: "branch", width: 12 },
       { header: "Cliente", key: "cust", width: 30 },
       { header: "Località", key: "city", width: 22 },
       { header: "Prov", key: "prov", width: 6 },
@@ -78,6 +99,7 @@ export async function GET(request: NextRequest) {
       ws.addRow({
         num: p.pickupNumber ?? "",
         date: itDate(p.pickupDate),
+        branch: branchName,
         cust: p.customer.name,
         city: p.address.city,
         prov: p.address.province,
@@ -92,39 +114,50 @@ export async function GET(request: NextRequest) {
         mc: p.volumeM3 ?? "",
       });
     }
-  } else {
-    const routes = await prisma.route.findMany({
-      where: { branchId, routeDate: range },
-      include: routeInclude,
-      orderBy: [{ routeDate: "asc" }, { createdAt: "asc" }],
-    });
 
-    ws.columns = [
+    styleHeader(ws);
+  } else {
+    const [routes, tractions] = await Promise.all([
+      prisma.route.findMany({
+        where: { branchId, routeDate: range },
+        include: routeInclude,
+        orderBy: [{ routeDate: "asc" }, { createdAt: "asc" }],
+      }),
+      prisma.traction.findMany({
+        where: { branchId, tractionDate: range },
+        include: { driver: { select: { name: true } } },
+        orderBy: [{ tractionDate: "asc" }, { createdAt: "asc" }],
+      }),
+    ]);
+
+    // ---- Foglio 1: Riepilogo giri (una riga per giro) --------------------
+    const wsSummary = wb.addWorksheet("Riepilogo giri");
+    wsSummary.columns = [
       { header: "Data", key: "date", width: 12 },
-      { header: "Giro (Autista / Mezzo)", key: "label", width: 28 },
+      { header: "Filiale", key: "branch", width: 12 },
+      { header: "Giro", key: "label", width: 26 },
       { header: "Autista", key: "driver", width: 16 },
       { header: "Mezzo", key: "vehicle", width: 18 },
       { header: "Fascia", key: "shift", width: 14 },
-      { header: "Stato", key: "status", width: 12 },
-      { header: "N. ritiri", key: "npick", width: 9 },
+      { header: "N. prese", key: "npick", width: 9 },
       { header: "N. resi", key: "nresi", width: 8 },
-      { header: "Pallet", key: "plt", width: 8 },
-      { header: "Metri", key: "m", width: 8 },
+      { header: "Pallet tot.", key: "plt", width: 10 },
+      { header: "Metri lin. tot.", key: "m", width: 13 },
       { header: "Peso (kg)", key: "kg", width: 10 },
       { header: "Volume (m³)", key: "mc", width: 12 },
       { header: "Km", key: "km", width: 8 },
       { header: "Costo (€)", key: "cost", width: 10 },
+      { header: "Stato", key: "status", width: 12 },
     ];
-
     for (const r of routes) {
       const ritiri = r.stops.filter((s) => s.pickup != null).length;
-      ws.addRow({
+      wsSummary.addRow({
         date: itDate(r.routeDate),
+        branch: branchName,
         label: routeLabel(r),
         driver: r.driver?.name ?? "",
         vehicle: r.vehicle?.name ?? "",
         shift: routeShiftLabels[r.shift],
-        status: routeStatusLabels[r.status],
         npick: ritiri,
         nresi: routeResiCount(r),
         plt: routeTotalPallets(r),
@@ -133,13 +166,173 @@ export async function GET(request: NextRequest) {
         mc: Math.round(routeTotalVolume(r) * 10) / 10,
         km: r.km ?? "",
         cost: routeTotalCost(r) ?? "",
+        status: routeStatusLabels[r.status],
       });
     }
-  }
+    styleHeader(wsSummary);
 
-  // Intestazione in grassetto
-  ws.getRow(1).font = { bold: true };
-  ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDCE1F5" } };
+    // ---- Foglio 2: Dettaglio prese eseguite (una riga per presa) ---------
+    const wsPickups = wb.addWorksheet("Dettaglio prese eseguite");
+    wsPickups.columns = [
+      { header: "Data giro", key: "date", width: 12 },
+      { header: "Filiale", key: "branch", width: 12 },
+      { header: "Giro", key: "label", width: 26 },
+      { header: "Autista", key: "driver", width: 16 },
+      { header: "Mezzo", key: "vehicle", width: 18 },
+      { header: "Seq.", key: "seq", width: 6 },
+      { header: "N. presa", key: "num", width: 18 },
+      { header: "Cliente", key: "cust", width: 30 },
+      { header: "Località", key: "city", width: 22 },
+      { header: "Indirizzo", key: "street", width: 30 },
+      { header: "Pallet", key: "plt", width: 8 },
+      { header: "Metri lin.", key: "mtl", width: 10 },
+      { header: "Colli", key: "colli", width: 8 },
+      { header: "Peso (kg)", key: "kg", width: 10 },
+      { header: "Volume (m³)", key: "mc", width: 12 },
+      { header: "Note", key: "notes", width: 30 },
+      { header: "Stato presa", key: "status", width: 12 },
+    ];
+    for (const r of routes) {
+      for (const s of r.stops) {
+        const p = s.pickup;
+        if (!p) continue;
+        wsPickups.addRow({
+          date: itDate(r.routeDate),
+          branch: branchName,
+          label: routeLabel(r),
+          driver: r.driver?.name ?? "",
+          vehicle: r.vehicle?.name ?? "",
+          seq: s.sequence,
+          num: p.pickupNumber ?? "",
+          cust: p.customer.name,
+          city: `${p.address.city} (${p.address.province})`,
+          street: p.address.street,
+          plt: p.pallets ?? "",
+          mtl: p.loadingMeters ?? "",
+          colli: p.colli ?? "",
+          kg: p.weightKg ?? "",
+          mc: p.volumeM3 ?? "",
+          notes: p.rawNotes ?? "",
+          status: pickupStatusLabels[p.status],
+        });
+      }
+    }
+    styleHeader(wsPickups);
+
+    // ---- Foglio 3: Dettaglio resi (una riga per reso, separato dai ritiri) --
+    const wsResi = wb.addWorksheet("Dettaglio resi");
+    wsResi.columns = [
+      { header: "Data giro", key: "date", width: 12 },
+      { header: "Filiale", key: "branch", width: 12 },
+      { header: "Giro", key: "label", width: 26 },
+      { header: "Autista", key: "driver", width: 16 },
+      { header: "Mezzo", key: "vehicle", width: 18 },
+      { header: "Seq.", key: "seq", width: 6 },
+      { header: "N. distinta", key: "num", width: 18 },
+      { header: "Cliente", key: "cust", width: 30 },
+      { header: "Località", key: "city", width: 22 },
+      { header: "Indirizzo", key: "street", width: 30 },
+      { header: "Resi", key: "resi", width: 8 },
+      { header: "Pallet", key: "plt", width: 8 },
+      { header: "Colli", key: "colli", width: 8 },
+      { header: "Peso (kg)", key: "kg", width: 10 },
+      { header: "Volume (m³)", key: "mc", width: 12 },
+      { header: "Note", key: "notes", width: 30 },
+    ];
+    for (const r of routes) {
+      for (const s of r.stops) {
+        const reso = s.reso;
+        if (!reso) continue;
+        wsResi.addRow({
+          date: itDate(r.routeDate),
+          branch: branchName,
+          label: routeLabel(r),
+          driver: r.driver?.name ?? "",
+          vehicle: r.vehicle?.name ?? "",
+          seq: s.sequence,
+          num: reso.distintaNumber ?? "",
+          cust: reso.customer.name,
+          city: reso.address ? `${reso.address.city} (${reso.address.province})` : "",
+          street: reso.address?.street ?? "",
+          resi: reso.resiCount ?? "",
+          plt: reso.pallets ?? "",
+          colli: reso.colli ?? "",
+          kg: reso.weightKg ?? "",
+          mc: reso.volumeM3 ?? "",
+          notes: reso.notes ?? "",
+        });
+      }
+    }
+    styleHeader(wsResi);
+
+    // ---- Foglio 4: Costi e km (giri + trazioni Eurosarda) ----------------
+    const wsCosts = wb.addWorksheet("Costi e km");
+    wsCosts.columns = [
+      { header: "Data", key: "date", width: 12 },
+      { header: "Filiale", key: "branch", width: 12 },
+      { header: "Tipo", key: "kind", width: 12 },
+      { header: "Descrizione", key: "desc", width: 34 },
+      { header: "Autista", key: "driver", width: 16 },
+      { header: "Mezzo / Targa", key: "vehicle", width: 18 },
+      { header: "Km", key: "km", width: 8 },
+      { header: "Costo (€)", key: "cost", width: 10 },
+    ];
+    // Righe unificate (giri + trazioni), ordinate per data così è facile
+    // sommare per giornata con un filtro/pivot in Excel.
+    type CostEntry = {
+      date: Date;
+      kind: string;
+      desc: string;
+      driver: string;
+      vehicle: string;
+      km: number | null;
+      cost: number | null;
+    };
+    const entries: CostEntry[] = [
+      ...routes.map((r) => ({
+        date: r.routeDate,
+        kind: "Giro",
+        desc: routeLabel(r),
+        driver: r.driver?.name ?? "",
+        vehicle: r.vehicle?.name ?? "",
+        km: r.km ?? null,
+        cost: routeTotalCost(r) ?? null,
+      })),
+      ...tractions.map((t) => ({
+        date: t.tractionDate,
+        kind: "Trazione",
+        desc: `${t.origin} → ${t.destination}`,
+        driver: t.driver?.name ?? "",
+        vehicle: t.plate ?? "",
+        km: t.km ?? null,
+        cost: t.cost ?? null,
+      })),
+    ].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    let totKm = 0;
+    let totCost = 0;
+    for (const e of entries) {
+      totKm += e.km ?? 0;
+      totCost += e.cost ?? 0;
+      wsCosts.addRow({
+        date: itDate(e.date),
+        branch: branchName,
+        kind: e.kind,
+        desc: e.desc,
+        driver: e.driver,
+        vehicle: e.vehicle,
+        km: e.km ?? "",
+        cost: e.cost ?? "",
+      });
+    }
+    const totalRow = wsCosts.addRow({
+      desc: "TOTALE",
+      km: Math.round(totKm * 10) / 10,
+      cost: Math.round(totCost * 100) / 100,
+    });
+    totalRow.font = { bold: true };
+    styleHeader(wsCosts);
+  }
 
   const buffer = await wb.xlsx.writeBuffer();
   const fileName = `${type}_${from}_${to}.xlsx`;
