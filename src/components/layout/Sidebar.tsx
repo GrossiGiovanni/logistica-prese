@@ -34,6 +34,7 @@ const nav: NavItem[] = [
       { href: "/storico", label: "Storico" },
       { href: "/report-mensile", label: "Report mensile" },
       { href: "/autisti-eurosarda", label: "Autisti Eurosarda" },
+      { href: "/trazioni", label: "Trazioni Eurosarda" },
     ],
   },
   {

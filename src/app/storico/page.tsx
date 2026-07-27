@@ -70,7 +70,14 @@ export default async function StoricoPage({
       <PageHeader
         title="Storico"
         description="Consultazione rapida di giri e prese per periodo, autista, cliente e mezzo"
-      />
+      >
+        <a href={`/api/export?type=prese&from=${from}&to=${to}`} className="btn-secondary">
+          Export prese (Excel)
+        </a>
+        <a href={`/api/export?type=giri&from=${from}&to=${to}`} className="btn-secondary">
+          Export giri (Excel)
+        </a>
+      </PageHeader>
 
       <form method="get" className="card mb-4 flex flex-wrap items-end gap-3 p-3">
         <div>

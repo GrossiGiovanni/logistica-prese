@@ -39,7 +39,7 @@ export default async function ReportMensilePage({
   // Fine del periodo "maturato": oggi se siamo nel mese, altrimenti fine mese.
   const elapsedEnd = todayDate < monthEnd ? (todayDate < monthStart ? monthStart : todayDate) : monthEnd;
 
-  const [routes, pickups, drivers] = await Promise.all([
+  const [routes, pickups, drivers, tractions] = await Promise.all([
     prisma.route.findMany({
       where: { routeDate: { gte: monthStart, lte: monthEnd } },
       include: routeInclude,
@@ -52,6 +52,10 @@ export default async function ReportMensilePage({
       where: { active: true },
       select: { id: true, name: true, defaultVehicle: { select: { vehicleType: true } } },
       orderBy: { name: "asc" },
+    }),
+    prisma.traction.findMany({
+      where: { tractionDate: { gte: monthStart, lte: monthEnd } },
+      select: { tractionDate: true, cost: true, km: true, driverId: true },
     }),
   ]);
 
@@ -66,6 +70,12 @@ export default async function ReportMensilePage({
     }
     const cost = routeTotalCost(r);
     if (cost != null) costByDay.set(day, (costByDay.get(day) ?? 0) + cost);
+  }
+  // Le trazioni sommano il loro costo alla giornata.
+  for (const t of tractions) {
+    if (t.cost == null) continue;
+    const day = toDateInputValue(t.tractionDate);
+    costByDay.set(day, (costByDay.get(day) ?? 0) + t.cost);
   }
   const pickupsByDay = new Map<string, number>();
   for (const p of pickups) {
@@ -95,6 +105,12 @@ export default async function ReportMensilePage({
   for (const r of routes) {
     if (r.driverId && r.km != null) {
       kmByDriver.set(r.driverId, (kmByDriver.get(r.driverId) ?? 0) + r.km);
+    }
+  }
+  // I km delle trazioni si sommano a quelli dei giri per l'autista indicato.
+  for (const t of tractions) {
+    if (t.driverId && t.km != null) {
+      kmByDriver.set(t.driverId, (kmByDriver.get(t.driverId) ?? 0) + t.km);
     }
   }
   const kmRows = drivers

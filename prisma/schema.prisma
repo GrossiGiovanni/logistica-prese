@@ -125,6 +125,7 @@ model Driver {
   defaultVehicle Vehicle? @relation("DriverDefaultVehicle", fields: [defaultVehicleId], references: [id], onDelete: SetNull)
   routes         Route[]
   trailerLogs    TrailerLog[]
+  tractions      Traction[]
 
   @@index([active])
 }
@@ -275,6 +276,27 @@ model Reso {
 
   @@index([resoDate])
   @@index([customerId])
+}
+
+// Trazione Eurosarda: tratta effettuata manualmente (punto A -> punto B),
+// con km calcolati e costo che entra nei totali/report giornalieri e mensili.
+model Traction {
+  id           String   @id @default(cuid())
+  tractionDate DateTime @db.Date
+  plate        String?
+  driverId     String?
+  origin       String // punto di partenza
+  destination  String // punto di arrivo
+  km           Float? // km calcolati (o inseriti a mano)
+  cost         Float? // costo della trazione (entra nel costo giornata)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  driver Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
+
+  @@index([tractionDate])
+  @@index([driverId])
 }
 
 // Registro manuale "Autisti Eurosarda": semirimorchio agganciato in porto

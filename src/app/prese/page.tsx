@@ -148,10 +148,13 @@ export default async function PresePage({
       />
 
       {!searching ? (
-        <div className="mb-3 flex items-center gap-2">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
           <Link href={`/prese?date=${prevDate}`} className="btn-secondary">← Giorno prec.</Link>
           <Link href={`/prese?date=${todayInputValue()}`} className="btn-secondary">Oggi</Link>
           <Link href={`/prese?date=${nextDate}`} className="btn-secondary">Giorno succ. →</Link>
+          <a href={`/api/export?type=prese&from=${viewDate}&to=${viewDate}`} className="btn-secondary ml-auto">
+            Export Excel
+          </a>
         </div>
       ) : (
         <div className="mb-3 rounded-md border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-700">
