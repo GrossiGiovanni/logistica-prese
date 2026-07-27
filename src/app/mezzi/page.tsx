@@ -5,6 +5,7 @@ import { Badge } from "@/components/badges/Badge";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { listVehicles } from "@/features/vehicles/queries";
 import { deleteVehicle } from "@/features/vehicles/actions";
+import { requireBranchId } from "@/lib/branch";
 import { vehicleTypeLabels, routeShiftLabels } from "@/lib/labels";
 import { formatEuro } from "@/lib/costs";
 
@@ -16,7 +17,8 @@ export default async function MezziPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q } = await searchParams;
-  const vehicles = await listVehicles(q);
+  const branchId = await requireBranchId();
+  const vehicles = await listVehicles(branchId, q);
 
   const columns: Column<Row>[] = [
     {

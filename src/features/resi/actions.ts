@@ -5,6 +5,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { requireBranchId } from "@/lib/branch";
 import { resoSchema, parseForm, type ActionResult } from "@/lib/validations";
 import { parseDateOnly } from "@/lib/dates";
 
@@ -15,10 +16,11 @@ export async function upsertReso(
   const id = (formData.get("id") as string) || undefined;
 
   // Creazione rapida cliente (solo in inserimento).
+  const branchId = id ? undefined : await requireBranchId();
   if (!id) {
     const newCustomerName = ((formData.get("newCustomerName") as string) || "").trim();
     if (newCustomerName) {
-      const c = await prisma.customer.create({ data: { name: newCustomerName } });
+      const c = await prisma.customer.create({ data: { name: newCustomerName, branchId } });
       formData.set("customerId", c.id);
     }
   }
@@ -36,7 +38,7 @@ export async function upsertReso(
   if (id) {
     await prisma.reso.update({ where: { id }, data });
   } else {
-    await prisma.reso.create({ data });
+    await prisma.reso.create({ data: { ...data, branchId } });
   }
 
   revalidatePath("/pianificazione");

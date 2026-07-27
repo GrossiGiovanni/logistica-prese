@@ -5,6 +5,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { requireBranchId } from "@/lib/branch";
 import { parseDateOnly, isValidDateInput } from "@/lib/dates";
 
 export async function createTrailerLog(formData: FormData): Promise<void> {
@@ -17,8 +18,9 @@ export async function createTrailerLog(formData: FormData): Promise<void> {
     redirect(`/autisti-eurosarda?error=campi`);
   }
 
+  const branchId = await requireBranchId();
   await prisma.trailerLog.create({
-    data: { logDate: parseDateOnly(logDate), driverId, trailerPlate, service },
+    data: { branchId, logDate: parseDateOnly(logDate), driverId, trailerPlate, service },
   });
 
   revalidatePath("/autisti-eurosarda");

@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { PickupForm } from "@/features/pickups/PickupForm";
 import { listCustomersWithAddresses } from "@/features/customers/queries";
 import { tomorrowInputValue } from "@/lib/dates";
+import { requireBranchId } from "@/lib/branch";
 
 export default async function NuovaPresaPage({
   searchParams,
@@ -9,7 +10,8 @@ export default async function NuovaPresaPage({
   searchParams: Promise<{ date?: string }>;
 }) {
   const { date } = await searchParams;
-  const customers = await listCustomersWithAddresses();
+  const branchId = await requireBranchId();
+  const customers = await listCustomersWithAddresses(branchId);
 
   return (
     <div>

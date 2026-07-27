@@ -3,9 +3,12 @@ import { ImportClient } from "@/features/imports/ImportClient";
 import { clearImportLogs } from "@/features/imports/actions";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { prisma } from "@/lib/db";
+import { requireBranchId } from "@/lib/branch";
 
 export default async function ImportaPage() {
+  const branchId = await requireBranchId();
   const logs = await prisma.importLog.findMany({
+    where: { branchId },
     orderBy: { createdAt: "desc" },
     take: 20,
   });

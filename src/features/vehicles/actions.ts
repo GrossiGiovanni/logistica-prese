@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { requireBranchId } from "@/lib/branch";
 import { vehicleSchema, parseForm, type ActionResult } from "@/lib/validations";
 
 export async function upsertVehicle(
@@ -18,7 +19,8 @@ export async function upsertVehicle(
   if (id) {
     await prisma.vehicle.update({ where: { id }, data });
   } else {
-    await prisma.vehicle.create({ data });
+    const branchId = await requireBranchId();
+    await prisma.vehicle.create({ data: { ...data, branchId } });
   }
 
   revalidatePath("/mezzi");

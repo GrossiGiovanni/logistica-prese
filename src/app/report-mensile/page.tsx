@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/ui/PageHeader";
 import { KpiCard, KpiGrid } from "@/components/ui/KpiCard";
 import { prisma } from "@/lib/db";
+import { requireBranchId } from "@/lib/branch";
 import { routeTotalCost, formatEuro } from "@/lib/costs";
 import { toDateInputValue, todayInputValue } from "@/lib/dates";
 import { routeInclude } from "@/features/routes/queries";
@@ -27,6 +28,7 @@ export default async function ReportMensilePage({
   searchParams: Promise<{ month?: string }>;
 }) {
   const { month } = await searchParams;
+  const branchId = await requireBranchId();
   const today = todayInputValue();
   const selectedMonth = month && /^\d{4}-\d{2}$/.test(month) ? month : today.slice(0, 7);
 
@@ -41,20 +43,20 @@ export default async function ReportMensilePage({
 
   const [routes, pickups, drivers, tractions] = await Promise.all([
     prisma.route.findMany({
-      where: { routeDate: { gte: monthStart, lte: monthEnd } },
+      where: { branchId, routeDate: { gte: monthStart, lte: monthEnd } },
       include: routeInclude,
     }),
     prisma.pickup.findMany({
-      where: { pickupDate: { gte: monthStart, lte: monthEnd }, status: { not: "CANCELLED" } },
+      where: { branchId, pickupDate: { gte: monthStart, lte: monthEnd }, status: { not: "CANCELLED" } },
       select: { pickupDate: true },
     }),
     prisma.driver.findMany({
-      where: { active: true },
+      where: { branchId, active: true },
       select: { id: true, name: true, defaultVehicle: { select: { vehicleType: true } } },
       orderBy: { name: "asc" },
     }),
     prisma.traction.findMany({
-      where: { tractionDate: { gte: monthStart, lte: monthEnd } },
+      where: { branchId, tractionDate: { gte: monthStart, lte: monthEnd } },
       select: { tractionDate: true, cost: true, km: true, driverId: true },
     }),
   ]);

@@ -1,8 +1,8 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
-export function listDrivers(search?: string) {
-  const where: Prisma.DriverWhereInput = {};
+export function listDrivers(branchId: string, search?: string) {
+  const where: Prisma.DriverWhereInput = { branchId };
   if (search && search.trim()) {
     const q = search.trim();
     where.OR = [
@@ -23,21 +23,21 @@ export function listDrivers(search?: string) {
   });
 }
 
-export function listActiveDrivers() {
+export function listActiveDrivers(branchId: string) {
   return prisma.driver.findMany({
-    where: { active: true },
+    where: { branchId, active: true },
     orderBy: { name: "asc" },
   });
 }
 
 /** Autisti attivi con flag "Autista Eurosarda" (sezione dedicata). */
-export function listEurosardaDrivers() {
+export function listEurosardaDrivers(branchId: string) {
   return prisma.driver.findMany({
-    where: { active: true, isEurosarda: true },
+    where: { branchId, active: true, isEurosarda: true },
     orderBy: { name: "asc" },
   });
 }
 
-export function getDriver(id: string) {
-  return prisma.driver.findUnique({ where: { id } });
+export function getDriver(branchId: string, id: string) {
+  return prisma.driver.findFirst({ where: { id, branchId } });
 }

@@ -11,6 +11,7 @@ import { deleteRecurringPickup } from "@/features/recurring-pickups/actions";
 import { GenerateRecurringForm } from "@/features/recurring-pickups/GenerateRecurringForm";
 import { timeWindowLabels } from "@/lib/labels";
 import { tomorrowInputValue } from "@/lib/dates";
+import { requireBranchId } from "@/lib/branch";
 
 const dayDefs: { key: keyof RecurringWithRelations; label: string }[] = [
   { key: "monday", label: "Lun" },
@@ -28,7 +29,8 @@ export default async function PreseFissePage({
   searchParams: Promise<{ gen?: string; genError?: string }>;
 }) {
   const { gen, genError } = await searchParams;
-  const recurrings = await listRecurringPickups();
+  const branchId = await requireBranchId();
+  const recurrings = await listRecurringPickups(branchId);
 
   let genMessage: string | null = null;
   if (gen) {

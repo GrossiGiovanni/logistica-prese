@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { RouteStatusBadge, PickupStatusBadge } from "@/components/badges/StatusBadge";
 import { prisma } from "@/lib/db";
+import { requireBranchId } from "@/lib/branch";
 import { routeTotalPallets } from "@/lib/warnings";
 import { routeTotalCost, formatEuro } from "@/lib/costs";
 import { routeLabel, routeShiftLabels } from "@/lib/labels";
@@ -15,6 +16,7 @@ export default async function StoricoPage({
   searchParams: Promise<{ from?: string; to?: string; driverId?: string; customerId?: string; vehicleId?: string }>;
 }) {
   const sp = await searchParams;
+  const branchId = await requireBranchId();
   // Default: ultimi 7 giorni.
   const from = sp.from && isValidDateInput(sp.from) ? sp.from : addDaysInput(todayInputValue(), -7);
   const to = sp.to && isValidDateInput(sp.to) ? sp.to : todayInputValue();
@@ -22,11 +24,12 @@ export default async function StoricoPage({
 
   const dateRange = { gte: parseDateOnly(from), lte: parseDateOnly(to) };
 
-  const routeWhere: Prisma.RouteWhereInput = { routeDate: dateRange };
+  const routeWhere: Prisma.RouteWhereInput = { branchId, routeDate: dateRange };
   if (driverId) routeWhere.driverId = driverId;
   if (vehicleId) routeWhere.vehicleId = vehicleId;
 
   const pickupWhere: Prisma.PickupWhereInput = {
+    branchId,
     pickupDate: dateRange,
     status: { not: "CANCELLED" },
   };
@@ -57,9 +60,9 @@ export default async function StoricoPage({
       orderBy: [{ pickupDate: "desc" }],
       take: 300,
     }),
-    prisma.driver.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    prisma.customer.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    prisma.vehicle.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.driver.findMany({ where: { branchId, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.customer.findMany({ where: { branchId }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.vehicle.findMany({ where: { branchId, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 
   const totKm = routes.reduce((s, r) => s + (r.km ?? 0), 0);

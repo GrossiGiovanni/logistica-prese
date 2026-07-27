@@ -4,6 +4,7 @@ import { DataTable, type Column } from "@/components/tables/DataTable";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { listCustomers } from "@/features/customers/queries";
 import { deleteCustomer } from "@/features/customers/actions";
+import { requireBranchId } from "@/lib/branch";
 
 type Row = Awaited<ReturnType<typeof listCustomers>>[number];
 
@@ -13,7 +14,8 @@ export default async function ClientiPage({
   searchParams: Promise<{ error?: string; q?: string }>;
 }) {
   const { error, q } = await searchParams;
-  const customers = await listCustomers(q);
+  const branchId = await requireBranchId();
+  const customers = await listCustomers(branchId, q);
 
   const columns: Column<Row>[] = [
     {

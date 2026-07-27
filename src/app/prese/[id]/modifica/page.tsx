@@ -4,6 +4,7 @@ import { PickupForm } from "@/features/pickups/PickupForm";
 import { getPickup } from "@/features/pickups/queries";
 import { listCustomersWithAddresses } from "@/features/customers/queries";
 import { tomorrowInputValue } from "@/lib/dates";
+import { requireBranchId } from "@/lib/branch";
 
 export default async function ModificaPresaPage({
   params,
@@ -11,9 +12,10 @@ export default async function ModificaPresaPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const branchId = await requireBranchId();
   const [pickup, customers] = await Promise.all([
-    getPickup(id),
-    listCustomersWithAddresses(),
+    getPickup(branchId, id),
+    listCustomersWithAddresses(branchId),
   ]);
   if (!pickup) notFound();
 

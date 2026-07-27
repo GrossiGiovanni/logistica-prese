@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { RecurringPickupForm } from "@/features/recurring-pickups/RecurringPickupForm";
 import { getRecurringPickup } from "@/features/recurring-pickups/queries";
 import { listCustomersWithAddresses } from "@/features/customers/queries";
+import { requireBranchId } from "@/lib/branch";
 
 export default async function ModificaPresaFissaPage({
   params,
@@ -10,9 +11,10 @@ export default async function ModificaPresaFissaPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const branchId = await requireBranchId();
   const [recurring, customers] = await Promise.all([
-    getRecurringPickup(id),
-    listCustomersWithAddresses(),
+    getRecurringPickup(branchId, id),
+    listCustomersWithAddresses(branchId),
   ]);
   if (!recurring) notFound();
 

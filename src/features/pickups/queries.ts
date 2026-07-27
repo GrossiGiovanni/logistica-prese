@@ -35,10 +35,10 @@ export type PickupFilters = {
   unassignedOnly?: boolean;
 };
 
-export function listPickups(filters: PickupFilters = {}) {
+export function listPickups(branchId: string, filters: PickupFilters = {}) {
   // Le prese annullate non compaiono mai (vengono comunque eliminate; restano
   // solo quelle da ricorrenza come blocco anti-rigenerazione, invisibili).
-  const where: Prisma.PickupWhereInput = { status: { not: "CANCELLED" } };
+  const where: Prisma.PickupWhereInput = { branchId, status: { not: "CANCELLED" } };
 
   if (filters.date) where.pickupDate = parseDateOnly(filters.date);
   if (filters.status && filters.status !== "CANCELLED") where.status = filters.status;
@@ -60,8 +60,8 @@ export function listPickups(filters: PickupFilters = {}) {
   });
 }
 
-export function getPickup(id: string) {
-  return prisma.pickup.findUnique({ where: { id } });
+export function getPickup(branchId: string, id: string) {
+  return prisma.pickup.findFirst({ where: { id, branchId } });
 }
 
 export type PickupMapPoint = {
@@ -77,9 +77,10 @@ export type PickupMapPoint = {
 };
 
 /** Prese del giorno con coordinate, per la mappa. Esclude annullate e prive di geocodifica. */
-export async function listPickupsForMap(date: string): Promise<PickupMapPoint[]> {
+export async function listPickupsForMap(branchId: string, date: string): Promise<PickupMapPoint[]> {
   const rows = await prisma.pickup.findMany({
     where: {
+      branchId,
       pickupDate: parseDateOnly(date),
       status: { not: "CANCELLED" },
       address: { lat: { not: null }, lng: { not: null } },
@@ -119,8 +120,9 @@ export type UnassignedFilters = {
  * pianificate. Include anche le prese **dei giorni precedenti** rimaste non
  * assegnate (pickupDate <= data selezionata), così da poterle recuperare.
  */
-export function listUnassignedPickups(date: string, filters: UnassignedFilters = {}) {
+export function listUnassignedPickups(branchId: string, date: string, filters: UnassignedFilters = {}) {
   const where: Prisma.PickupWhereInput = {
+    branchId,
     pickupDate: { lte: parseDateOnly(date) },
     status: { in: ["READY", "DRAFT"] },
     routeStops: { none: {} },

@@ -40,6 +40,7 @@ import {
 } from "@/features/routes/whatsapp-message";
 import { timeWindowLabels, priorityLabels, routeLabel } from "@/lib/labels";
 import { formatDateIt, toDateInputValue } from "@/lib/dates";
+import { requireBranchId } from "@/lib/branch";
 
 export default async function GiroDettaglioPage({
   params,
@@ -50,14 +51,15 @@ export default async function GiroDettaglioPage({
 }) {
   const { id } = await params;
   const { q } = await searchParams;
-  const route = await getRoute(id);
+  const branchId = await requireBranchId();
+  const route = await getRoute(branchId, id);
   if (!route) notFound();
 
   const dateStr = toDateInputValue(route.routeDate);
   const [unassigned, activeDrivers, activeVehicles] = await Promise.all([
-    listUnassignedPickups(dateStr, { search: q || undefined }),
-    listActiveDrivers(),
-    listActiveVehicles(),
+    listUnassignedPickups(branchId, dateStr, { search: q || undefined }),
+    listActiveDrivers(branchId),
+    listActiveVehicles(branchId),
   ]);
 
   // Includi sempre autista/mezzo già assegnati tra le opzioni (anche se inattivi),

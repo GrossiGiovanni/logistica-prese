@@ -7,6 +7,7 @@ import { RouteWarningBadges } from "@/components/badges/WarningBadge";
 import { DateSelector } from "@/components/ui/DateSelector";
 import { listRoutes } from "@/features/routes/queries";
 import { getOpDate } from "@/lib/persisted-filters";
+import { requireBranchId } from "@/lib/branch";
 import { routeTotalPallets, routeOccupiedMeters, routeUsesMotrice, getRouteWarnings } from "@/lib/warnings";
 import { routeShiftLabels, routeLabel } from "@/lib/labels";
 import { formatDateIt, tomorrowInputValue, parseDateOnly } from "@/lib/dates";
@@ -17,8 +18,9 @@ export default async function GiriPage({
   searchParams: Promise<{ date?: string }>;
 }) {
   const { date } = await searchParams;
+  const branchId = await requireBranchId();
   const selectedDate = date ?? (await getOpDate()) ?? tomorrowInputValue();
-  const routes = await listRoutes(selectedDate);
+  const routes = await listRoutes(branchId, selectedDate);
 
   return (
     <div>

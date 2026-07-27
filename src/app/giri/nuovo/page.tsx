@@ -3,6 +3,7 @@ import { RouteForm } from "@/features/routes/RouteForm";
 import { listActiveDrivers } from "@/features/drivers/queries";
 import { listActiveVehicles } from "@/features/vehicles/queries";
 import { tomorrowInputValue } from "@/lib/dates";
+import { requireBranchId } from "@/lib/branch";
 
 export default async function NuovoGiroPage({
   searchParams,
@@ -10,9 +11,10 @@ export default async function NuovoGiroPage({
   searchParams: Promise<{ date?: string }>;
 }) {
   const { date } = await searchParams;
+  const branchId = await requireBranchId();
   const [drivers, vehicles] = await Promise.all([
-    listActiveDrivers(),
-    listActiveVehicles(),
+    listActiveDrivers(branchId),
+    listActiveVehicles(branchId),
   ]);
 
   return (

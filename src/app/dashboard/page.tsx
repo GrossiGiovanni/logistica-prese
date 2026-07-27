@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { getDailyStats } from "@/features/dashboard/queries";
 import { ensureRecurringForDate } from "@/features/recurring-pickups/generate";
 import { prisma } from "@/lib/db";
+import { requireBranchId } from "@/lib/branch";
 import { getOpDate } from "@/lib/persisted-filters";
 import { hasMissingData, routeTotalPallets, routeUsesMotrice } from "@/lib/warnings";
 import { routeTotalCost, formatEuro } from "@/lib/costs";
@@ -21,15 +22,16 @@ export default async function DashboardPage({
   searchParams: Promise<{ date?: string }>;
 }) {
   const { date } = await searchParams;
+  const branchId = await requireBranchId();
   const selectedDate = date ?? (await getOpDate()) ?? tomorrowInputValue();
 
   await ensureRecurringForDate(selectedDate);
 
-  const { pickups, routes, kpi } = await getDailyStats(selectedDate);
+  const { pickups, routes, kpi } = await getDailyStats(branchId, selectedDate);
 
   // Costo giornata = costo dei giri + costo delle trazioni del giorno.
   const tractionsAgg = await prisma.traction.aggregate({
-    where: { tractionDate: parseDateOnly(selectedDate) },
+    where: { branchId, tractionDate: parseDateOnly(selectedDate) },
     _sum: { cost: true },
   });
   const dailyCost =

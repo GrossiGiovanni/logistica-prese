@@ -30,14 +30,14 @@ export const routeInclude = {
 
 export type RouteWithRelations = Prisma.RouteGetPayload<{ include: typeof routeInclude }>;
 
-export function listRoutes(date?: string) {
+export function listRoutes(branchId: string, date?: string) {
   return prisma.route.findMany({
-    where: date ? { routeDate: parseDateOnly(date) } : undefined,
+    where: { branchId, ...(date ? { routeDate: parseDateOnly(date) } : {}) },
     include: routeInclude,
     orderBy: [{ routeDate: "asc" }, { shift: "asc" }, { createdAt: "asc" }],
   });
 }
 
-export function getRoute(id: string) {
-  return prisma.route.findUnique({ where: { id }, include: routeInclude });
+export function getRoute(branchId: string, id: string) {
+  return prisma.route.findFirst({ where: { id, branchId }, include: routeInclude });
 }

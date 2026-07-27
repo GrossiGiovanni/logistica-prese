@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { requireBranchId } from "@/lib/branch";
 import { geocodeAddress } from "@/lib/geocode";
 import { recalcRouteKm } from "@/features/routes/actions";
 import { pickupSchema, parseForm, type ActionResult } from "@/lib/validations";
@@ -19,10 +20,11 @@ export async function upsertPickup(
   const id = (formData.get("id") as string) || undefined;
 
   // Creazione rapida (solo in inserimento): nuovo cliente e/o nuovo indirizzo.
+  const branchId = id ? undefined : await requireBranchId();
   if (!id) {
     const newCustomerName = field(formData, "newCustomerName");
     if (newCustomerName) {
-      const c = await prisma.customer.create({ data: { name: newCustomerName } });
+      const c = await prisma.customer.create({ data: { name: newCustomerName, branchId } });
       formData.set("customerId", c.id);
     }
 
@@ -62,7 +64,7 @@ export async function upsertPickup(
   if (id) {
     await prisma.pickup.update({ where: { id }, data });
   } else {
-    await prisma.pickup.create({ data });
+    await prisma.pickup.create({ data: { ...data, branchId } });
   }
 
   revalidatePath("/prese");

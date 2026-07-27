@@ -54,6 +54,7 @@ export async function generateRecurringPickups(dateStr: string): Promise<Generat
   await prisma.pickup.createMany({
     data: toCreate.map((r) => ({
       pickupDate: date,
+      branchId: r.branchId, // la presa eredita la filiale della ricorrenza
       customerId: r.customerId,
       addressId: r.addressId,
       sourceType: "RECURRING" as const,

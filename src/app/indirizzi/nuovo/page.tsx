@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/ui/PageHeader";
 import { AddressForm } from "@/features/addresses/AddressForm";
 import { listCustomers } from "@/features/customers/queries";
+import { requireBranchId } from "@/lib/branch";
 
 export default async function NuovoIndirizzoPage({
   searchParams,
@@ -8,7 +9,8 @@ export default async function NuovoIndirizzoPage({
   searchParams: Promise<{ customerId?: string }>;
 }) {
   const { customerId } = await searchParams;
-  const customers = await listCustomers();
+  const branchId = await requireBranchId();
+  const customers = await listCustomers(branchId);
 
   return (
     <div>

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { requireBranchId } from "@/lib/branch";
 import { routeSchema, parseForm, type ActionResult } from "@/lib/validations";
 import { parseDateOnly, isValidDateInput } from "@/lib/dates";
 import { computeRouteKm } from "@/lib/distance";
@@ -79,9 +80,11 @@ export async function createRoute(
   if (!parsed.success) return parsed.result;
 
   const { routeDate, driverId, vehicleId, ...rest } = parsed.data;
+  const branchId = await requireBranchId();
   const route = await prisma.route.create({
     data: {
       ...rest,
+      branchId,
       routeDate: parseDateOnly(routeDate),
       driverId: driverId ?? null,
       vehicleId: vehicleId ?? null,

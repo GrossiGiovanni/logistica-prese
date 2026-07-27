@@ -8,21 +8,21 @@ import { routeInclude } from "@/features/routes/queries";
  * Statistiche operative del giorno, riutilizzate da /dashboard e /pianificazione.
  * Le prese annullate sono escluse dai conteggi.
  */
-export async function getDailyStats(dateStr: string) {
+export async function getDailyStats(branchId: string, dateStr: string) {
   const date = parseDateOnly(dateStr);
 
   const [pickups, routes, availableVehicles] = await Promise.all([
     prisma.pickup.findMany({
-      where: { pickupDate: date, status: { not: "CANCELLED" } },
+      where: { branchId, pickupDate: date, status: { not: "CANCELLED" } },
       include: pickupInclude,
       orderBy: [{ priority: "desc" }, { timeWindow: "asc" }],
     }),
     prisma.route.findMany({
-      where: { routeDate: date },
+      where: { branchId, routeDate: date },
       include: routeInclude,
       orderBy: [{ shift: "asc" }, { createdAt: "asc" }],
     }),
-    prisma.vehicle.count({ where: { active: true } }),
+    prisma.vehicle.count({ where: { branchId, active: true } }),
   ]);
 
   const total = pickups.length;

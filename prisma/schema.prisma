@@ -67,8 +67,31 @@ enum RouteStatus {
 // MODELS
 // =============================================================================
 
+// Filiale operativa (Milano, Torino, ...). Tutti i dati operativi sono separati
+// per filiale tramite il campo branchId.
+model Branch {
+  id       String  @id @default(cuid())
+  name     String
+  code     String  @unique
+  active   Boolean @default(true)
+  createdAt DateTime @default(now())
+
+  customers        Customer[]
+  drivers          Driver[]
+  vehicles         Vehicle[]
+  pickups          Pickup[]
+  recurringPickups RecurringPickup[]
+  routes           Route[]
+  resi             Reso[]
+  tractions        Traction[]
+  trailerLogs      TrailerLog[]
+  importLogs       ImportLog[]
+}
+
 model Customer {
   id        String   @id @default(cuid())
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id])
   name      String
   vatNumber String?
   phone     String?
@@ -83,6 +106,7 @@ model Customer {
   resi             Reso[]
 
   @@index([name])
+  @@index([branchId])
 }
 
 model Address {
@@ -111,6 +135,8 @@ model Address {
 
 model Driver {
   id               String   @id @default(cuid())
+  branchId         String?
+  branch           Branch?  @relation(fields: [branchId], references: [id])
   name             String
   code             String?
   phone            String? // Telefono/WhatsApp in formato internazionale (es. +39...)
@@ -128,10 +154,13 @@ model Driver {
   tractions      Traction[]
 
   @@index([active])
+  @@index([branchId])
 }
 
 model Vehicle {
   id               String      @id @default(cuid())
+  branchId         String?
+  branch           Branch?     @relation(fields: [branchId], references: [id])
   name             String
   plate            String?
   owner            String? // Titolare / padroncino (es. RA.MA., OMAR, EUROSARDA)
@@ -154,10 +183,13 @@ model Vehicle {
 
   @@index([active])
   @@index([vehicleType])
+  @@index([branchId])
 }
 
 model Pickup {
   id                String           @id @default(cuid())
+  branchId          String?
+  branch            Branch?          @relation(fields: [branchId], references: [id])
   pickupNumber      String? // Numero presa AS400 (es. "2026 13 9004641")
   pickupDate        DateTime         @db.Date
   customerId        String
@@ -194,10 +226,13 @@ model Pickup {
   @@index([sourceType])
   @@index([customerId])
   @@index([pickupNumber])
+  @@index([branchId])
 }
 
 model RecurringPickup {
   id                     String     @id @default(cuid())
+  branchId               String?
+  branch                 Branch?    @relation(fields: [branchId], references: [id])
   customerId             String
   addressId              String
   active                 Boolean    @default(true)
@@ -232,6 +267,8 @@ model RecurringPickup {
 
 model Route {
   id            String      @id @default(cuid())
+  branchId      String?
+  branch        Branch?     @relation(fields: [branchId], references: [id])
   routeDate     DateTime    @db.Date
   driverId      String?
   vehicleId     String?
@@ -251,12 +288,15 @@ model Route {
 
   @@index([routeDate])
   @@index([status])
+  @@index([branchId])
 }
 
 // Reso: uscita per sola consegna di resi al cliente (nessun ritiro associato).
 // Registrato in pianificazione con la sua "distinta" al posto del numero presa.
 model Reso {
   id             String   @id @default(cuid())
+  branchId       String?
+  branch         Branch?  @relation(fields: [branchId], references: [id])
   distintaNumber String? // numero distinta
   resoDate       DateTime @db.Date
   customerId     String
@@ -276,12 +316,15 @@ model Reso {
 
   @@index([resoDate])
   @@index([customerId])
+  @@index([branchId])
 }
 
 // Trazione Eurosarda: tratta effettuata manualmente (punto A -> punto B),
 // con km calcolati e costo che entra nei totali/report giornalieri e mensili.
 model Traction {
   id           String   @id @default(cuid())
+  branchId     String?
+  branch       Branch?  @relation(fields: [branchId], references: [id])
   tractionDate DateTime @db.Date
   plate        String?
   driverId     String?
@@ -297,12 +340,15 @@ model Traction {
 
   @@index([tractionDate])
   @@index([driverId])
+  @@index([branchId])
 }
 
 // Registro manuale "Autisti Eurosarda": semirimorchio agganciato in porto
 // e servizio effettuato, per controlli successivi.
 model TrailerLog {
   id           String   @id @default(cuid())
+  branchId     String?
+  branch       Branch?  @relation(fields: [branchId], references: [id])
   logDate      DateTime @db.Date
   driverId     String
   trailerPlate String // targa semirimorchio agganciato
@@ -318,6 +364,8 @@ model TrailerLog {
 
 model ImportLog {
   id           String   @id @default(cuid())
+  branchId     String?
+  branch       Branch?  @relation(fields: [branchId], references: [id])
   fileName     String
   totalRows    Int
   imported     Int

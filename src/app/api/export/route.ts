@@ -5,6 +5,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import ExcelJS from "exceljs";
 import { prisma } from "@/lib/db";
+import { getCurrentBranchId } from "@/lib/branch";
 import { routeInclude } from "@/features/routes/queries";
 import {
   routeTotalPallets,
@@ -24,6 +25,10 @@ function itDate(d: Date): string {
 }
 
 export async function GET(request: NextRequest) {
+  const branchId = await getCurrentBranchId();
+  if (!branchId) {
+    return new NextResponse("Nessuna filiale selezionata.", { status: 400 });
+  }
   const sp = request.nextUrl.searchParams;
   const type = sp.get("type") === "giri" ? "giri" : "prese";
   const from = isValidDateInput(sp.get("from") ?? "") ? sp.get("from")! : addDaysInput(todayInputValue(), -30);
@@ -36,7 +41,7 @@ export async function GET(request: NextRequest) {
 
   if (type === "prese") {
     const pickups = await prisma.pickup.findMany({
-      where: { pickupDate: range, status: { not: "CANCELLED" } },
+      where: { branchId, pickupDate: range, status: { not: "CANCELLED" } },
       include: {
         customer: { select: { name: true } },
         address: { select: { city: true, province: true } },
@@ -89,7 +94,7 @@ export async function GET(request: NextRequest) {
     }
   } else {
     const routes = await prisma.route.findMany({
-      where: { routeDate: range },
+      where: { branchId, routeDate: range },
       include: routeInclude,
       orderBy: [{ routeDate: "asc" }, { createdAt: "asc" }],
     });

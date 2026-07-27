@@ -9,6 +9,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
+import { requireBranchId } from "@/lib/branch";
 import { geocodeAddress } from "@/lib/geocode";
 import { parseAs400Workbook, pickupNumberKey, type ParsedRow } from "./parse";
 
@@ -36,6 +37,7 @@ export type ImportPreview = {
 };
 
 export async function previewImport(formData: FormData): Promise<ImportPreview> {
+  const branchId = await requireBranchId();
   const mode: ImportMode = formData.get("mode") === "aggiornamento" ? "aggiornamento" : "operativo";
   const empty = { mode, fileName: "", totalRows: 0, newCount: 0, updateCount: 0, existingCount: 0, errorCount: 0, rows: [] };
   const file = formData.get("file");
@@ -57,10 +59,10 @@ export async function previewImport(formData: FormData): Promise<ImportPreview> 
     return { ok: false, error: parsed.headerError, ...empty, fileName: file.name };
   }
 
-  // Numeri presa già in dashboard (match sul segmento finale del numero:
-  // "2026 13 9005032" e "9005032" sono la stessa presa)
+  // Numeri presa già in dashboard PER QUESTA FILIALE (match sul segmento finale
+  // del numero: "2026 13 9005032" e "9005032" sono la stessa presa)
   const existing = await prisma.pickup.findMany({
-    where: { pickupNumber: { not: null } },
+    where: { branchId, pickupNumber: { not: null } },
     select: { pickupNumber: true },
   });
   const existingNumbers = new Set(existing.map((p) => pickupNumberKey(p.pickupNumber)));
@@ -112,9 +114,10 @@ export async function previewImport(formData: FormData): Promise<ImportPreview> 
   };
 }
 
-/** Svuota lo storico degli import (solo il log: le prese importate restano). */
+/** Svuota lo storico degli import della filiale corrente (le prese restano). */
 export async function clearImportLogs(): Promise<void> {
-  await prisma.importLog.deleteMany();
+  const branchId = await requireBranchId();
+  await prisma.importLog.deleteMany({ where: { branchId } });
   revalidatePath("/importa");
 }
 
@@ -128,15 +131,16 @@ export type ImportResult = {
 };
 
 export async function confirmImport(preview: ImportPreview): Promise<ImportResult> {
+  const branchId = await requireBranchId();
   const newRows = preview.rows.filter((r) => r.status === "new");
   const updateRows = preview.rows.filter((r) => r.status === "update");
   if (newRows.length === 0 && updateRows.length === 0) {
     return { ok: false, error: "Nessuna presa da importare o aggiornare.", imported: 0, updated: 0, skipped: 0, errors: 0 };
   }
 
-  // Mappa chiave numero presa -> presa esistente, per creare o aggiornare.
+  // Mappa chiave numero presa -> presa esistente (della filiale), per creare o aggiornare.
   const existing = await prisma.pickup.findMany({
-    where: { pickupNumber: { not: null } },
+    where: { branchId, pickupNumber: { not: null } },
     select: {
       id: true,
       pickupNumber: true,
@@ -153,10 +157,11 @@ export async function confirmImport(preview: ImportPreview): Promise<ImportResul
   const existingNumbers = new Set(existingByNumber.keys());
   const aggiornamento = preview.mode === "aggiornamento";
 
-  // Cache clienti/indirizzi esistenti (dedup per nome / cliente+via+città)
-  const customers = await prisma.customer.findMany({ select: { id: true, name: true } });
+  // Cache clienti/indirizzi esistenti della filiale (dedup per nome / cliente+via+città)
+  const customers = await prisma.customer.findMany({ where: { branchId }, select: { id: true, name: true } });
   const customerByName = new Map(customers.map((c) => [key(c.name), c.id]));
   const addresses = await prisma.address.findMany({
+    where: { customer: { branchId } },
     select: { id: true, customerId: true, street: true, city: true },
   });
   const addressByKey = new Map(
@@ -238,7 +243,7 @@ export async function confirmImport(preview: ImportPreview): Promise<ImportResul
       }
       let customerId = customerByName.get(key(r.mittente));
       if (!customerId) {
-        const c = await prisma.customer.create({ data: { name: r.mittente! } });
+        const c = await prisma.customer.create({ data: { name: r.mittente!, branchId } });
         customerId = c.id;
         customerByName.set(key(r.mittente), customerId);
       }
@@ -266,6 +271,7 @@ export async function confirmImport(preview: ImportPreview): Promise<ImportResul
 
       await prisma.pickup.create({
         data: {
+          branchId,
           pickupNumber: r.numero!,
           pickupDate: new Date(`${r.date}T00:00:00.000Z`),
           customerId,
@@ -299,6 +305,7 @@ export async function confirmImport(preview: ImportPreview): Promise<ImportResul
 
   await prisma.importLog.create({
     data: {
+      branchId,
       fileName: preview.fileName,
       totalRows: preview.totalRows,
       imported,

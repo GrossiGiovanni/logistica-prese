@@ -12,6 +12,7 @@ import { hasMissingData } from "@/lib/warnings";
 import { pickupSourceLabels, timeWindowLabels, priorityLabels, routeStatusLabels, routeLabel } from "@/lib/labels";
 import { formatDateIt, todayInputValue, addDaysInput, parseDateOnly } from "@/lib/dates";
 import { getPreseFilters, getOpDate } from "@/lib/persisted-filters";
+import { requireBranchId } from "@/lib/branch";
 import { RouteStatusBadge } from "@/components/badges/StatusBadge";
 import type { PickupStatus, PickupSourceType, TimeWindow } from "@prisma/client";
 
@@ -21,7 +22,7 @@ export default async function PresePage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const sp = await searchParams;
-  const [saved, opDate] = await Promise.all([getPreseFilters(), getOpDate()]);
+  const [saved, opDate, branchId] = await Promise.all([getPreseFilters(), getOpDate(), requireBranchId()]);
 
   // Vista per giornata: una data è sempre selezionata. Quando c'è una ricerca,
   // si cerca su TUTTE le date (così trovi una presa qualsiasi e il suo giro).
@@ -36,7 +37,7 @@ export default async function PresePage({
     search: saved.search || undefined,
     unassignedOnly: saved.unassigned === "1",
   };
-  const pickups = await listPickups(filters);
+  const pickups = await listPickups(branchId, filters);
 
   // Stato per la barra filtri: mostra sempre la data corrente.
   const barCurrent = { ...filters, date: viewDate, unassigned: filters.unassignedOnly };

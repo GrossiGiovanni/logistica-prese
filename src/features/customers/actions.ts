@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { requireBranchId } from "@/lib/branch";
 import { customerSchema, parseForm, type ActionResult } from "@/lib/validations";
 
 export async function upsertCustomer(
@@ -18,7 +19,8 @@ export async function upsertCustomer(
   if (id) {
     await prisma.customer.update({ where: { id }, data });
   } else {
-    await prisma.customer.create({ data });
+    const branchId = await requireBranchId();
+    await prisma.customer.create({ data: { ...data, branchId } });
   }
 
   revalidatePath("/clienti");

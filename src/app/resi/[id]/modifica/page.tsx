@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { ResoForm } from "@/features/resi/ResoForm";
 import { listCustomersWithAddresses } from "@/features/customers/queries";
 import { prisma } from "@/lib/db";
+import { requireBranchId } from "@/lib/branch";
 import { toDateInputValue } from "@/lib/dates";
 
 export default async function ModificaResoPage({
@@ -11,9 +12,10 @@ export default async function ModificaResoPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const branchId = await requireBranchId();
   const [reso, customers] = await Promise.all([
-    prisma.reso.findUnique({ where: { id } }),
-    listCustomersWithAddresses(),
+    prisma.reso.findFirst({ where: { id, branchId } }),
+    listCustomersWithAddresses(branchId),
   ]);
   if (!reso) notFound();
 

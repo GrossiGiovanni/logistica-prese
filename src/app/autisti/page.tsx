@@ -5,6 +5,7 @@ import { Badge } from "@/components/badges/Badge";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { listDrivers } from "@/features/drivers/queries";
 import { deleteDriver } from "@/features/drivers/actions";
+import { requireBranchId } from "@/lib/branch";
 
 type Row = Awaited<ReturnType<typeof listDrivers>>[number];
 
@@ -14,7 +15,8 @@ export default async function AutistiPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q } = await searchParams;
-  const drivers = await listDrivers(q);
+  const branchId = await requireBranchId();
+  const drivers = await listDrivers(branchId, q);
 
   const columns: Column<Row>[] = [
     {

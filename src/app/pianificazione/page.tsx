@@ -13,6 +13,7 @@ import { cancelPickup } from "@/features/pickups/actions";
 import { deleteReso } from "@/features/resi/actions";
 import { ensureRecurringForDate } from "@/features/recurring-pickups/generate";
 import { prisma } from "@/lib/db";
+import { requireBranchId } from "@/lib/branch";
 import {
   routeTotalPallets,
   routeOccupiedMeters,
@@ -41,7 +42,7 @@ export default async function PianificazionePage({
   searchParams: Promise<{ date?: string }>;
 }) {
   const { date } = await searchParams;
-  const [saved, opDate] = await Promise.all([getPianFilters(), getOpDate()]);
+  const [saved, opDate, branchId] = await Promise.all([getPianFilters(), getOpDate(), requireBranchId()]);
   const { q, tw, prio } = saved;
   const selectedDate = date ?? opDate ?? tomorrowInputValue();
   const redirectTo = `/pianificazione?date=${selectedDate}`;
@@ -51,14 +52,14 @@ export default async function PianificazionePage({
   await ensureRecurringForDate(selectedDate);
 
   const [{ routes, kpi }, unassigned, resi] = await Promise.all([
-    getDailyStats(selectedDate),
-    listUnassignedPickups(selectedDate, {
+    getDailyStats(branchId, selectedDate),
+    listUnassignedPickups(branchId, selectedDate, {
       search: q || undefined,
       timeWindow: (tw as TimeWindow) || undefined,
       priority: (prio as Priority) || undefined,
     }),
     prisma.reso.findMany({
-      where: { resoDate: parseDateOnly(selectedDate) },
+      where: { branchId, resoDate: parseDateOnly(selectedDate) },
       include: {
         customer: { select: { name: true } },
         address: { select: { city: true, province: true } },

@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { NewTractionForm, TractionRow } from "@/features/tractions/TractionRow";
 import { listActiveDrivers } from "@/features/drivers/queries";
 import { prisma } from "@/lib/db";
+import { requireBranchId } from "@/lib/branch";
 import { formatEuro } from "@/lib/costs";
 import {
   formatDateIt,
@@ -18,6 +19,7 @@ export default async function TrazioniPage({
   searchParams: Promise<{ from?: string; to?: string; driverId?: string; error?: string }>;
 }) {
   const sp = await searchParams;
+  const branchId = await requireBranchId();
   const from = sp.from && isValidDateInput(sp.from) ? sp.from : addDaysInput(todayInputValue(), -30);
   const to = sp.to && isValidDateInput(sp.to) ? sp.to : todayInputValue();
   const driverId = sp.driverId || "";
@@ -25,13 +27,14 @@ export default async function TrazioniPage({
   const [tractions, drivers] = await Promise.all([
     prisma.traction.findMany({
       where: {
+        branchId,
         tractionDate: { gte: parseDateOnly(from), lte: parseDateOnly(to) },
         ...(driverId ? { driverId } : {}),
       },
       include: { driver: { select: { name: true } } },
       orderBy: [{ tractionDate: "desc" }, { createdAt: "asc" }],
     }),
-    listActiveDrivers(),
+    listActiveDrivers(branchId),
   ]);
 
   const back = `from=${from}&to=${to}${driverId ? `&driverId=${driverId}` : ""}`;

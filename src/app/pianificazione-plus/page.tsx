@@ -6,6 +6,7 @@ import { listUnassignedPickups } from "@/features/pickups/queries";
 import { listRoutes } from "@/features/routes/queries";
 import { ensureRecurringForDate } from "@/features/recurring-pickups/generate";
 import { getOpDate } from "@/lib/persisted-filters";
+import { requireBranchId } from "@/lib/branch";
 import {
   getRouteWarnings,
   findResourceOverlaps,
@@ -77,13 +78,14 @@ export default async function PianificazionePlusPage({
   searchParams: Promise<{ date?: string }>;
 }) {
   const { date } = await searchParams;
+  const branchId = await requireBranchId();
   const selectedDate = date ?? (await getOpDate()) ?? tomorrowInputValue();
 
   await ensureRecurringForDate(selectedDate);
 
   const [unassignedRaw, routesRaw] = await Promise.all([
-    listUnassignedPickups(selectedDate),
-    listRoutes(selectedDate),
+    listUnassignedPickups(branchId, selectedDate),
+    listRoutes(branchId, selectedDate),
   ]);
 
   const overlapIds = findResourceOverlaps(routesRaw.filter((r) => r.stops.length > 0));

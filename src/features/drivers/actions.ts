@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { requireBranchId } from "@/lib/branch";
 import { driverSchema, parseForm, type ActionResult } from "@/lib/validations";
 
 export async function upsertDriver(
@@ -19,7 +20,8 @@ export async function upsertDriver(
   if (id) {
     await prisma.driver.update({ where: { id }, data });
   } else {
-    await prisma.driver.create({ data });
+    const branchId = await requireBranchId();
+    await prisma.driver.create({ data: { ...data, branchId } });
   }
 
   revalidatePath("/autisti");

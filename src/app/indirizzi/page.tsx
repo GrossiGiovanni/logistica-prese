@@ -4,6 +4,7 @@ import { DataTable, type Column } from "@/components/tables/DataTable";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { listAddresses } from "@/features/addresses/queries";
 import { deleteAddress } from "@/features/addresses/actions";
+import { requireBranchId } from "@/lib/branch";
 
 type Row = Awaited<ReturnType<typeof listAddresses>>[number];
 
@@ -13,7 +14,8 @@ export default async function IndirizziPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
-  const addresses = await listAddresses();
+  const branchId = await requireBranchId();
+  const addresses = await listAddresses(branchId);
 
   const columns: Column<Row>[] = [
     { header: "Cliente", cell: (a) => a.customer.name },

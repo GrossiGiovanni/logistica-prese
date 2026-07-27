@@ -4,7 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "@/features/auth/actions";
+import { switchBranch } from "@/features/branch/actions";
 import { Logo } from "./Logo";
+
+type BranchInfo = { id: string; name: string; code: string };
 
 type NavLink = { href: string; label: string };
 type NavItem = NavLink | { label: string; children: NavLink[] };
@@ -87,11 +90,11 @@ function NavGroup({ label, links }: { label: string; links: NavLink[] }) {
   );
 }
 
-export function Sidebar({ userEmail }: { userEmail?: string }) {
+export function Sidebar({ userEmail, branch }: { userEmail?: string; branch?: BranchInfo | null }) {
   const pathname = usePathname();
 
-  // Niente sidebar nella pagina di login.
-  if (pathname === "/login") return null;
+  // Niente sidebar nella pagina di login o nella scelta filiale.
+  if (pathname === "/login" || pathname === "/scegli-filiale") return null;
 
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-slate-200 bg-white">
@@ -101,6 +104,26 @@ export function Sidebar({ userEmail }: { userEmail?: string }) {
           Pianificazione ritiri
         </div>
       </div>
+
+      {branch ? (
+        <div className="border-b border-slate-200 px-3 py-2">
+          <div className="flex items-center justify-between rounded-md bg-brand-50 px-2.5 py-1.5">
+            <div className="min-w-0">
+              <div className="text-[10px] font-medium uppercase tracking-wide text-brand-500">Filiale</div>
+              <div className="truncate text-sm font-semibold text-brand-700">{branch.name}</div>
+            </div>
+            <form action={switchBranch}>
+              <button
+                type="submit"
+                className="rounded-md px-2 py-1 text-xs font-medium text-brand-600 transition hover:bg-brand-100"
+                title="Cambia filiale"
+              >
+                Cambia
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : null}
       <nav className="flex-1 space-y-1 p-2">
         {nav.map((item) =>
           "children" in item ? (

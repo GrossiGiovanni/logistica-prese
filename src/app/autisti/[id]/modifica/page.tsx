@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { DriverForm } from "@/features/drivers/DriverForm";
 import { getDriver } from "@/features/drivers/queries";
 import { listActiveVehicles } from "@/features/vehicles/queries";
+import { requireBranchId } from "@/lib/branch";
 
 export default async function ModificaAutistaPage({
   params,
@@ -10,7 +11,8 @@ export default async function ModificaAutistaPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [driver, vehicles] = await Promise.all([getDriver(id), listActiveVehicles()]);
+  const branchId = await requireBranchId();
+  const [driver, vehicles] = await Promise.all([getDriver(branchId, id), listActiveVehicles(branchId)]);
   if (!driver) notFound();
 
   return (

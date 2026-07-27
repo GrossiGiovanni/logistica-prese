@@ -4,6 +4,7 @@ import { TrailerLogRow } from "@/features/trailer-logs/TrailerLogRow";
 import { listEurosardaDrivers } from "@/features/drivers/queries";
 import { toDateInputValue } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import { requireBranchId } from "@/lib/branch";
 import {
   formatDateIt,
   todayInputValue,
@@ -18,6 +19,7 @@ export default async function AutistiEurosardaPage({
   searchParams: Promise<{ from?: string; to?: string; driverId?: string; error?: string }>;
 }) {
   const sp = await searchParams;
+  const branchId = await requireBranchId();
   // Default: ultimi 30 giorni.
   const from = sp.from && isValidDateInput(sp.from) ? sp.from : addDaysInput(todayInputValue(), -30);
   const to = sp.to && isValidDateInput(sp.to) ? sp.to : todayInputValue();
@@ -26,6 +28,7 @@ export default async function AutistiEurosardaPage({
   const [logs, drivers] = await Promise.all([
     prisma.trailerLog.findMany({
       where: {
+        branchId,
         logDate: { gte: parseDateOnly(from), lte: parseDateOnly(to) },
         driver: { isEurosarda: true },
         ...(driverId ? { driverId } : {}),
@@ -33,7 +36,7 @@ export default async function AutistiEurosardaPage({
       include: { driver: { select: { name: true } } },
       orderBy: [{ logDate: "desc" }, { createdAt: "asc" }],
     }),
-    listEurosardaDrivers(),
+    listEurosardaDrivers(branchId),
   ]);
 
   const backParams = `from=${from}&to=${to}${driverId ? `&driverId=${driverId}` : ""}`;

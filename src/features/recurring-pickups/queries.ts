@@ -10,13 +10,14 @@ export type RecurringWithRelations = Prisma.RecurringPickupGetPayload<{
   include: typeof recurringInclude;
 }>;
 
-export function listRecurringPickups() {
+export function listRecurringPickups(branchId: string) {
   return prisma.recurringPickup.findMany({
+    where: { branchId },
     orderBy: [{ active: "desc" }, { customer: { name: "asc" } }],
     include: recurringInclude,
   });
 }
 
-export function getRecurringPickup(id: string) {
-  return prisma.recurringPickup.findUnique({ where: { id } });
+export function getRecurringPickup(branchId: string, id: string) {
+  return prisma.recurringPickup.findFirst({ where: { id, branchId } });
 }

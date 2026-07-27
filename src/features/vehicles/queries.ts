@@ -3,8 +3,8 @@ import { prisma } from "@/lib/db";
 
 const VEHICLE_TYPES = ["VAN", "TRUCK", "BILICO", "MOTRICE"] as const;
 
-export function listVehicles(search?: string) {
-  const where: Prisma.VehicleWhereInput = {};
+export function listVehicles(branchId: string, search?: string) {
+  const where: Prisma.VehicleWhereInput = { branchId };
   if (search && search.trim()) {
     const q = search.trim();
     // Il tipo è un enum: match per nome tipo scritto in chiaro (es. "motrice").
@@ -23,13 +23,13 @@ export function listVehicles(search?: string) {
   });
 }
 
-export function listActiveVehicles() {
+export function listActiveVehicles(branchId: string) {
   return prisma.vehicle.findMany({
-    where: { active: true },
+    where: { branchId, active: true },
     orderBy: [{ vehicleType: "asc" }, { name: "asc" }],
   });
 }
 
-export function getVehicle(id: string) {
-  return prisma.vehicle.findUnique({ where: { id } });
+export function getVehicle(branchId: string, id: string) {
+  return prisma.vehicle.findFirst({ where: { id, branchId } });
 }

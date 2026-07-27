@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { requireBranchId } from "@/lib/branch";
 import {
   recurringPickupSchema,
   parseForm,
@@ -24,7 +25,8 @@ export async function upsertRecurringPickup(
   if (id) {
     await prisma.recurringPickup.update({ where: { id }, data });
   } else {
-    await prisma.recurringPickup.create({ data });
+    const branchId = await requireBranchId();
+    await prisma.recurringPickup.create({ data: { ...data, branchId } });
   }
 
   revalidatePath("/prese-fisse");

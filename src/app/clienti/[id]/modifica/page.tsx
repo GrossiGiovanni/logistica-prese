@@ -5,6 +5,7 @@ import { CustomerForm } from "@/features/customers/CustomerForm";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { getCustomerWithAddresses } from "@/features/customers/queries";
 import { deleteAddress } from "@/features/addresses/actions";
+import { requireBranchId } from "@/lib/branch";
 
 export default async function ModificaClientePage({
   params,
@@ -12,7 +13,8 @@ export default async function ModificaClientePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const customer = await getCustomerWithAddresses(id);
+  const branchId = await requireBranchId();
+  const customer = await getCustomerWithAddresses(branchId, id);
   if (!customer) notFound();
 
   return (

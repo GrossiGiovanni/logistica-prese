@@ -1,8 +1,8 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
-export function listCustomers(search?: string) {
-  const where: Prisma.CustomerWhereInput = {};
+export function listCustomers(branchId: string, search?: string) {
+  const where: Prisma.CustomerWhereInput = { branchId };
   if (search && search.trim()) {
     const q = search.trim();
     where.OR = [
@@ -31,14 +31,14 @@ export function listCustomers(search?: string) {
   });
 }
 
-export function getCustomer(id: string) {
-  return prisma.customer.findUnique({ where: { id } });
+export function getCustomer(branchId: string, id: string) {
+  return prisma.customer.findFirst({ where: { id, branchId } });
 }
 
 /** Cliente con i suoi indirizzi (per la scheda cliente). */
-export function getCustomerWithAddresses(id: string) {
-  return prisma.customer.findUnique({
-    where: { id },
+export function getCustomerWithAddresses(branchId: string, id: string) {
+  return prisma.customer.findFirst({
+    where: { id, branchId },
     include: {
       addresses: {
         orderBy: [{ label: "asc" }, { city: "asc" }],
@@ -49,8 +49,9 @@ export function getCustomerWithAddresses(id: string) {
 }
 
 /** Clienti con i loro indirizzi — usato nei form delle prese. */
-export function listCustomersWithAddresses() {
+export function listCustomersWithAddresses(branchId: string) {
   return prisma.customer.findMany({
+    where: { branchId },
     orderBy: { name: "asc" },
     include: { addresses: { orderBy: { label: "asc" } } },
   });

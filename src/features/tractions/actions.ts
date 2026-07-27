@@ -5,6 +5,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { requireBranchId } from "@/lib/branch";
 import { parseDateOnly, isValidDateInput } from "@/lib/dates";
 
 /**
@@ -72,7 +73,8 @@ export async function upsertTraction(formData: FormData): Promise<void> {
   if (id) {
     await prisma.traction.update({ where: { id }, data });
   } else {
-    await prisma.traction.create({ data });
+    const branchId = await requireBranchId();
+    await prisma.traction.create({ data: { ...data, branchId } });
   }
 
   revalidatePath("/trazioni");
