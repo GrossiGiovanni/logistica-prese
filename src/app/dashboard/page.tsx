@@ -1,138 +1,155 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { KpiCard, KpiGrid } from "@/components/ui/KpiCard";
-import { Badge } from "@/components/badges/Badge";
-import { PickupStatusBadge, RouteStatusBadge } from "@/components/badges/StatusBadge";
-import { MissingDataBadge } from "@/components/badges/WarningBadge";
-import { DateSelector } from "@/components/ui/DateSelector";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { getDailyStats } from "@/features/dashboard/queries";
-import { ensureRecurringForDate } from "@/features/recurring-pickups/generate";
-import { prisma } from "@/lib/db";
 import { requireBranchId } from "@/lib/branch";
-import { getOpDate } from "@/lib/persisted-filters";
-import { hasMissingData, routeTotalPallets, routeUsesMotrice } from "@/lib/warnings";
-import { routeTotalCost, formatEuro } from "@/lib/costs";
-import { routeShiftLabels, timeWindowLabels, routeLabel } from "@/lib/labels";
-import { formatDateIt, tomorrowInputValue, parseDateOnly } from "@/lib/dates";
+import { getMonthlyStats } from "@/features/reports/monthly";
+import { formatEuro } from "@/lib/costs";
+import { todayInputValue } from "@/lib/dates";
+
+const nf1 = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1 });
+const nf0 = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 0 });
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ month?: string }>;
 }) {
-  const { date } = await searchParams;
+  const { month } = await searchParams;
   const branchId = await requireBranchId();
-  const selectedDate = date ?? (await getOpDate()) ?? tomorrowInputValue();
+  const stats = await getMonthlyStats(branchId, month ?? "");
+  const today = todayInputValue();
 
-  await ensureRecurringForDate(selectedDate);
-
-  const { pickups, routes, kpi } = await getDailyStats(branchId, selectedDate);
-
-  // Costo giornata = costo dei giri + costo delle trazioni del giorno.
-  const tractionsAgg = await prisma.traction.aggregate({
-    where: { branchId, tractionDate: parseDateOnly(selectedDate) },
-    _sum: { cost: true },
-  });
-  const dailyCost =
-    routes.reduce((sum, r) => sum + (routeTotalCost(r) ?? 0), 0) +
-    (tractionsAgg._sum.cost ?? 0);
+  const volLabel = (v: number) => `${nf1.format(Math.round(v * 10) / 10)} m³`;
 
   return (
     <div>
       <PageHeader
         title="Dashboard"
-        description={`Riepilogo operativo del ${formatDateIt(parseDateOnly(selectedDate))}`}
+        description={`Panoramica del mese — ${stats.monthLabel}`}
       >
-        <DateSelector value={selectedDate} label="Giorno" />
-        <Link href="/importa" className="btn-secondary">
-          Importa prese da AS400
-        </Link>
-        <Link href={`/pianificazione?date=${selectedDate}`} className="btn-primary">
+        <form method="get" className="flex items-end gap-2">
+          <input type="month" name="month" defaultValue={stats.month} className="field-input w-auto" />
+          <button type="submit" className="btn-secondary">Vai</button>
+        </form>
+        <Link href={`/pianificazione?date=${today}`} className="btn-primary">
           Vai alla pianificazione
         </Link>
       </PageHeader>
 
+      {/* KPI principali del mese */}
       <KpiGrid>
         <KpiCard
-          label="Prese totali / da assegnare"
-          value={`${kpi.total} / ${kpi.unassigned}`}
-          tone={kpi.unassigned > 0 ? "amber" : "green"}
+          label="Prese del mese"
+          value={nf0.format(stats.pickupsCount)}
+          hint={`≈ ${nf1.format(stats.avgPickupsPerDay)} / giorno operativo`}
+        />
+        <KpiCard label="Volumi pianificati" value={volLabel(stats.volumeM3)} />
+        <KpiCard label="Giri del mese" value={nf0.format(stats.routesCount)} />
+        <KpiCard
+          label="Costo raccolta previsto"
+          value={stats.projectedCost > 0 ? formatEuro(Math.round(stats.projectedCost)) : "—"}
+          tone="blue"
+          hint="Registrato + proiezione fine mese"
         />
         <KpiCard
-          label="Costo totale giornata"
-          value={dailyCost > 0 ? formatEuro(dailyCost) : "—"}
-          hint="Stima giri del giorno"
+          label="Costo registrato"
+          value={stats.registeredCost > 0 ? formatEuro(Math.round(stats.registeredCost)) : "—"}
+        />
+        <KpiCard label="Pallet del mese" value={nf0.format(stats.pallets)} />
+        <KpiCard
+          label="Mezzi medi / giorno"
+          value={nf1.format(stats.avgVehiclesPerDay)}
         />
         <KpiCard
-          label="Mezzi disponibili / assegnati"
-          value={`${kpi.availableVehicles} / ${kpi.vehiclesUsed}`}
+          label="Giorni operativi"
+          value={`${stats.operativeDays} / ${stats.workdaysTotal}`}
+          hint="Con attività / lavorativi"
         />
       </KpiGrid>
 
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Prese del giorno */}
-        <section>
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-slate-900">Prese del giorno</h2>
-            <Link href="/prese" className="text-sm text-brand-700 hover:underline">Tutte le prese</Link>
+      {/* Classifiche + forecast */}
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {/* Top cliente */}
+        <div className="card p-4">
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Top cliente
           </div>
-          {pickups.length === 0 ? (
-            <EmptyState title="Nessuna presa" description="Nessuna presa per questa data." />
+          {stats.topCustomer ? (
+            <>
+              <div className="mt-1 truncate text-xl font-bold text-slate-900" title={stats.topCustomer.name}>
+                {stats.topCustomer.name}
+              </div>
+              <div className="mt-0.5 text-sm text-slate-500">
+                {nf0.format(stats.topCustomer.count)} prese · {volLabel(stats.topCustomer.volume)}
+              </div>
+            </>
           ) : (
-            <ul className="space-y-2">
-              {pickups.map((p) => (
-                <li key={p.id} className="card flex items-center justify-between gap-3 p-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Link href={`/prese/${p.id}/modifica`} className="font-medium text-slate-800 hover:underline">
-                        {p.customer.name}
-                      </Link>
-                      {p.sourceType === "RECURRING" ? <Badge tone="blue">Fissa</Badge> : null}
-                      {hasMissingData(p) ? <MissingDataBadge /> : null}
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      {p.address.city} ({p.address.province}) · {timeWindowLabels[p.timeWindow]} · {p.pallets ?? "—"} pallet
-                    </div>
-                  </div>
-                  <PickupStatusBadge status={p.status} />
-                </li>
-              ))}
-            </ul>
+            <div className="mt-1 text-xl font-bold text-slate-300">—</div>
           )}
-        </section>
+        </div>
 
-        {/* Giri del giorno */}
-        <section>
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-slate-900">Giri del giorno</h2>
-            <Link href={`/giri?date=${selectedDate}`} className="text-sm text-brand-700 hover:underline">Tutti i giri</Link>
+        {/* Top autista */}
+        <div className="card p-4">
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Top autista
           </div>
-          {routes.length === 0 ? (
-            <EmptyState title="Nessun giro" description="Nessun giro creato per questa data." />
+          {stats.topDriver ? (
+            <>
+              <div className="mt-1 truncate text-xl font-bold text-slate-900" title={stats.topDriver.name}>
+                {stats.topDriver.name}
+              </div>
+              <div className="mt-0.5 text-sm text-slate-500">
+                {nf0.format(stats.topDriver.pickups)} prese · {nf0.format(stats.topDriver.routes)} giri
+              </div>
+            </>
           ) : (
-            <ul className="space-y-2">
-              {routes.map((r) => (
-                <li key={r.id} className="card flex items-center justify-between gap-3 p-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Link href={`/giri/${r.id}`} className="font-medium text-slate-800 hover:underline">
-                        {routeLabel(r)}
-                      </Link>
-                      {routeUsesMotrice(r) ? <Badge tone="purple">Motrice</Badge> : null}
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      {routeShiftLabels[r.shift]} · {r.driver?.name ?? "—"} · {r.stops.length} prese · {routeTotalPallets(r)} pallet
-                      {r.km != null ? ` · ${r.km} km` : ""}
-                      {routeTotalCost(r) != null ? ` · ${formatEuro(routeTotalCost(r))}` : ""}
-                    </div>
-                  </div>
-                  <RouteStatusBadge status={r.status} />
-                </li>
-              ))}
-            </ul>
+            <div className="mt-1 text-xl font-bold text-slate-300">—</div>
           )}
-        </section>
+        </div>
+
+        {/* Forecast fine mese */}
+        <div className="card border-brand-200 bg-brand-50/50 p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-medium uppercase tracking-wide text-brand-600">
+              Forecast fine mese
+            </div>
+            <Link href={`/report-mensile?month=${stats.month}`} className="text-xs text-brand-700 hover:underline">
+              Dettaglio →
+            </Link>
+          </div>
+          <dl className="mt-2 space-y-1 text-sm">
+            <div className="flex items-center justify-between">
+              <dt className="text-slate-500">Prese previste</dt>
+              <dd className="font-semibold text-slate-800">{nf0.format(Math.round(stats.projectedPickups))}</dd>
+            </div>
+            <div className="flex items-center justify-between">
+              <dt className="text-slate-500">Volumi previsti</dt>
+              <dd className="font-semibold text-slate-800">{volLabel(stats.projectedVolume)}</dd>
+            </div>
+            <div className="flex items-center justify-between">
+              <dt className="text-slate-500">Costo raccolta previsto</dt>
+              <dd className="font-semibold text-brand-700">
+                {stats.projectedCost > 0 ? formatEuro(Math.round(stats.projectedCost)) : "—"}
+              </dd>
+            </div>
+          </dl>
+          {stats.workdaysRemaining > 0 ? (
+            <div className="mt-2 text-xs text-slate-400">
+              Proiezione su {stats.workdaysRemaining} giorni lavorativi rimanenti.
+            </div>
+          ) : (
+            <div className="mt-2 text-xs text-slate-400">Mese completato: valori a consuntivo.</div>
+          )}
+        </div>
+      </div>
+
+      {/* Accessi rapidi operativi */}
+      <div className="mt-6 flex flex-wrap gap-2">
+        <Link href={`/pianificazione?date=${today}`} className="btn-secondary">Pianificazione di oggi</Link>
+        <Link href="/prese" className="btn-secondary">Prese</Link>
+        <Link href="/giri" className="btn-secondary">Giri</Link>
+        <Link href="/importa" className="btn-secondary">Importa prese da AS400</Link>
+        <Link href={`/report-mensile?month=${stats.month}`} className="btn-secondary">Report mensile</Link>
       </div>
     </div>
   );
