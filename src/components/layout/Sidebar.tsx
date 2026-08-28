@@ -19,6 +19,7 @@ const nav: NavItem[] = [
     children: [
       { href: "/pianificazione", label: "Pianificazione" },
       { href: "/pianificazione-plus", label: "Pianificazione Plus" },
+      { href: "/pianificazione-fabio", label: "Pianificazione Fabio" },
     ],
   },
   {
