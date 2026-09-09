@@ -32,6 +32,7 @@ const nav: NavItem[] = [
     ],
   },
   { href: "/giri", label: "Giri" },
+  { href: "/carichi", label: "Carichi" },
   {
     label: "Report",
     children: [

@@ -86,6 +86,7 @@ model Branch {
   tractions        Traction[]
   trailerLogs      TrailerLog[]
   importLogs       ImportLog[]
+  carichi          Carico[]
 }
 
 model Customer {
@@ -360,6 +361,29 @@ model TrailerLog {
 
   @@index([logDate])
   @@index([driverId])
+}
+
+// Carico manuale: informazioni di carico gestite a mano dal magazzino,
+// indipendenti da prese e giri (nessun collegamento alla pianificazione).
+model Carico {
+  id          String   @id @default(cuid())
+  branchId    String?
+  branch      Branch?  @relation(fields: [branchId], references: [id])
+  loadDate    DateTime @db.Date
+  carrier     String // vettore
+  plate       String? // targa
+  destination String? // destinazione
+  reference   String? // riferimento / n. documento
+  pallets     Int?
+  colli       Int?
+  weightKg    Float?
+  volumeM3    Float?
+  notes       String? // note di carico
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([loadDate])
+  @@index([branchId])
 }
 
 model ImportLog {

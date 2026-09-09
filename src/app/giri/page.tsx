@@ -29,6 +29,13 @@ export default async function GiriPage({
         description={`Giri del ${formatDateIt(parseDateOnly(selectedDate))}`}
       >
         <DateSelector value={selectedDate} label="Data" />
+        <a
+          href={`/api/export?type=giornata&date=${selectedDate}`}
+          className="btn-secondary"
+          title="Dettaglio di tutti i giri della giornata da passare al magazzino"
+        >
+          Export Excel giornata
+        </a>
         <Link href={`/giri/nuovo?date=${selectedDate}`} className="btn-primary">
           Nuovo giro
         </Link>
