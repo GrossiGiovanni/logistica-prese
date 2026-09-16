@@ -32,9 +32,9 @@ export default async function GiriPage({
         <a
           href={`/api/export?type=giornata&date=${selectedDate}`}
           className="btn-secondary"
-          title="Dettaglio di tutti i giri della giornata da passare al magazzino"
+          title="Lista scarichi della giornata (autista e clienti) per il magazzino"
         >
-          Export Excel giornata
+          Export lista scarichi
         </a>
         <Link href={`/giri/nuovo?date=${selectedDate}`} className="btn-primary">
           Nuovo giro

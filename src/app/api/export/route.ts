@@ -1,9 +1,9 @@
 // Export Excel (.xlsx), sempre limitato alla filiale corrente.
 // /api/export?type=prese&from=YYYY-MM-DD&to=YYYY-MM-DD
 // /api/export?type=giri&from=YYYY-MM-DD&to=YYYY-MM-DD
-// /api/export?type=giornata&date=YYYY-MM-DD   — dettaglio operativo di TUTTI i
-//                                               giri della giornata (magazzino)
-// /api/export?type=carichi&from=&to=&carrier= — carichi manuali
+// /api/export?type=giornata&date=YYYY-MM-DD   — lista scarichi per il magazzino:
+//                                               solo Autista + Cliente
+// /api/export?type=carichi&from=&to=&carrier= — carichi: solo Vettore + Note
 //
 // L'export "giri" produce un file multi-foglio:
 //   1) Riepilogo giri     — una riga per giro
@@ -123,7 +123,9 @@ export async function GET(request: NextRequest) {
 
     styleHeader(ws);
   } else if (type === "giornata") {
-    // ---- Dettaglio operativo di TUTTI i giri della giornata (per il magazzino) ----
+    // ---- Lista scarichi per il magazzino: SOLO autista + cliente ----
+    // Tabella volutamente essenziale: niente indirizzi, quantita', km o note,
+    // che in magazzino rendono il file poco leggibile.
     const day = isValidDateInput(sp.get("date") ?? "") ? sp.get("date")! : todayInputValue();
     const routes = await prisma.route.findMany({
       where: { branchId, routeDate: parseDateOnly(day) },
@@ -131,133 +133,28 @@ export async function GET(request: NextRequest) {
       orderBy: [{ shift: "asc" }, { createdAt: "asc" }],
     });
 
-    // Foglio 1: un riepilogo per ogni giro della giornata.
-    const wsSum = wb.addWorksheet("Giri della giornata");
-    wsSum.columns = [
-      { header: "Data", key: "date", width: 12 },
-      { header: "Filiale", key: "branch", width: 12 },
-      { header: "Giro", key: "label", width: 28 },
-      { header: "Autista", key: "driver", width: 16 },
-      { header: "Mezzo", key: "vehicle", width: 18 },
-      { header: "Fascia", key: "shift", width: 14 },
-      { header: "Stato", key: "status", width: 12 },
-      { header: "N. prese", key: "npick", width: 9 },
-      { header: "N. resi", key: "nresi", width: 8 },
-      { header: "Pallet", key: "plt", width: 9 },
-      { header: "Metri lin.", key: "m", width: 11 },
-      { header: "Peso (kg)", key: "kg", width: 11 },
-      { header: "Volume (m³)", key: "mc", width: 12 },
-      { header: "Km", key: "km", width: 8 },
-    ];
+    // Una riga per presa: l'autista si ripete su ognuna delle sue prese.
+    const rows: { driver: string; customer: string }[] = [];
     for (const r of routes) {
-      wsSum.addRow({
-        date: itDate(r.routeDate),
-        branch: branchName,
-        label: routeLabel(r),
-        driver: r.driver?.name ?? "",
-        vehicle: r.vehicle?.name ?? "",
-        shift: routeShiftLabels[r.shift],
-        status: routeStatusLabels[r.status],
-        npick: r.stops.filter((s) => s.pickup != null).length,
-        nresi: routeResiCount(r),
-        plt: routeTotalPallets(r),
-        m: routeOccupiedMeters(r),
-        kg: Math.round(routeTotalWeight(r)),
-        mc: Math.round(routeTotalVolume(r) * 10) / 10,
-        km: r.km ?? "",
-      });
-    }
-    styleHeader(wsSum);
-
-    // Foglio 2: clienti/prese ritirati, raggruppati per giro e in ordine di fermata.
-    const wsPick = wb.addWorksheet("Clienti ritirati");
-    wsPick.columns = [
-      { header: "Data giro", key: "date", width: 12 },
-      { header: "Giro", key: "label", width: 28 },
-      { header: "Autista", key: "driver", width: 16 },
-      { header: "Mezzo", key: "vehicle", width: 18 },
-      { header: "Fascia", key: "shift", width: 14 },
-      { header: "Ordine", key: "seq", width: 8 },
-      { header: "N. presa", key: "num", width: 20 },
-      { header: "Cliente", key: "cust", width: 32 },
-      { header: "Indirizzo", key: "street", width: 34 },
-      { header: "Località", key: "city", width: 22 },
-      { header: "Prov", key: "prov", width: 6 },
-      { header: "Pallet", key: "plt", width: 9 },
-      { header: "Metri lin.", key: "mtl", width: 11 },
-      { header: "Colli", key: "colli", width: 8 },
-      { header: "Peso (kg)", key: "kg", width: 11 },
-      { header: "Volume (m³)", key: "mc", width: 12 },
-      { header: "Note", key: "notes", width: 38 },
-    ];
-    for (const r of routes) {
+      const driver = r.driver?.name ?? "Autista da assegnare";
       for (const s of r.stops) {
-        const p = s.pickup;
-        if (!p) continue;
-        wsPick.addRow({
-          date: itDate(r.routeDate),
-          label: routeLabel(r),
-          driver: r.driver?.name ?? "",
-          vehicle: r.vehicle?.name ?? "",
-          shift: routeShiftLabels[r.shift],
-          seq: s.sequence,
-          num: p.pickupNumber ?? "",
-          cust: p.customer.name,
-          street: p.address.street,
-          city: p.address.city,
-          prov: p.address.province,
-          plt: p.pallets ?? "",
-          mtl: p.loadingMeters ?? "",
-          colli: p.colli ?? "",
-          kg: p.weightKg ?? "",
-          mc: p.volumeM3 ?? "",
-          notes: p.rawNotes ?? "",
-        });
+        if (!s.pickup) continue;
+        rows.push({ driver, customer: s.pickup.customer.name });
       }
     }
-    styleHeader(wsPick);
+    // Righe dello stesso autista vicine; il sort stabile mantiene l'ordine
+    // delle fermate all'interno del singolo autista.
+    rows.sort((a, b) => a.driver.localeCompare(b.driver, "it"));
 
-    // Foglio 3: resi della giornata (quantitativi separati dai ritiri).
-    const resiRows = routes.flatMap((r) =>
-      r.stops.filter((s) => s.reso != null).map((s) => ({ r, s })),
-    );
-    if (resiRows.length > 0) {
-      const wsR = wb.addWorksheet("Resi");
-      wsR.columns = [
-        { header: "Data giro", key: "date", width: 12 },
-        { header: "Giro", key: "label", width: 28 },
-        { header: "Autista", key: "driver", width: 16 },
-        { header: "Ordine", key: "seq", width: 8 },
-        { header: "N. distinta", key: "num", width: 20 },
-        { header: "Cliente", key: "cust", width: 32 },
-        { header: "Indirizzo", key: "street", width: 34 },
-        { header: "Località", key: "city", width: 24 },
-        { header: "Resi", key: "resi", width: 8 },
-        { header: "Pallet", key: "plt", width: 9 },
-        { header: "Colli", key: "colli", width: 8 },
-        { header: "Note", key: "notes", width: 38 },
-      ];
-      for (const { r, s } of resiRows) {
-        const reso = s.reso!;
-        wsR.addRow({
-          date: itDate(r.routeDate),
-          label: routeLabel(r),
-          driver: r.driver?.name ?? "",
-          seq: s.sequence,
-          num: reso.distintaNumber ?? "",
-          cust: reso.customer.name,
-          street: reso.address?.street ?? "",
-          city: reso.address ? `${reso.address.city} (${reso.address.province})` : "",
-          resi: reso.resiCount ?? "",
-          plt: reso.pallets ?? "",
-          colli: reso.colli ?? "",
-          notes: reso.notes ?? "",
-        });
-      }
-      styleHeader(wsR);
-    }
+    const ws = wb.addWorksheet("Lista scarichi");
+    ws.columns = [
+      { header: "Autista", key: "driver", width: 28 },
+      { header: "Cliente", key: "customer", width: 46 },
+    ];
+    for (const row of rows) ws.addRow(row);
+    styleHeader(ws);
 
-    fileName = `giri_giornata_${day}.xlsx`;
+    fileName = `lista_scarichi_${day}.xlsx`;
   } else if (type === "carichi") {
     // ---- Carichi manuali (indipendenti da prese e giri) ----
     const carrier = (sp.get("carrier") ?? "").trim();
@@ -270,34 +167,14 @@ export async function GET(request: NextRequest) {
       orderBy: [{ loadDate: "asc" }, { createdAt: "asc" }],
     });
 
+    // Tabella essenziale a due colonne: solo vettore e note di carico.
     const ws = wb.addWorksheet("Carichi");
     ws.columns = [
-      { header: "Data", key: "date", width: 12 },
-      { header: "Filiale", key: "branch", width: 12 },
-      { header: "Vettore", key: "carrier", width: 26 },
-      { header: "Targa", key: "plate", width: 12 },
-      { header: "Destinazione", key: "dest", width: 26 },
-      { header: "Riferimento", key: "ref", width: 18 },
-      { header: "Pallet", key: "plt", width: 9 },
-      { header: "Colli", key: "colli", width: 8 },
-      { header: "Peso (kg)", key: "kg", width: 11 },
-      { header: "Volume (m³)", key: "mc", width: 12 },
-      { header: "Note di carico", key: "notes", width: 40 },
+      { header: "Vettore", key: "carrier", width: 32 },
+      { header: "Note di carico", key: "notes", width: 60 },
     ];
     for (const c of carichi) {
-      ws.addRow({
-        date: itDate(c.loadDate),
-        branch: branchName,
-        carrier: c.carrier,
-        plate: c.plate ?? "",
-        dest: c.destination ?? "",
-        ref: c.reference ?? "",
-        plt: c.pallets ?? "",
-        colli: c.colli ?? "",
-        kg: c.weightKg ?? "",
-        mc: c.volumeM3 ?? "",
-        notes: c.notes ?? "",
-      });
+      ws.addRow({ carrier: c.carrier, notes: c.notes ?? "" });
     }
     styleHeader(ws);
   } else {
