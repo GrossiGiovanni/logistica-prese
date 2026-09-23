@@ -38,6 +38,7 @@ const nav: NavItem[] = [
     children: [
       { href: "/storico", label: "Storico" },
       { href: "/report-mensile", label: "Report mensile" },
+      { href: "/resi", label: "Resi" },
       { href: "/autisti-eurosarda", label: "Autisti Eurosarda" },
       { href: "/trazioni", label: "Trazioni Eurosarda" },
     ],
@@ -48,6 +49,7 @@ const nav: NavItem[] = [
       { href: "/clienti", label: "Clienti" },
       { href: "/autisti", label: "Autisti" },
       { href: "/mezzi", label: "Mezzi" },
+      { href: "/trazionisti", label: "Trazionisti" },
     ],
   },
 ];

@@ -5,7 +5,7 @@
 
 import { prisma } from "@/lib/db";
 import { routeInclude } from "@/features/routes/queries";
-import { routeTotalCost } from "@/lib/costs";
+import { routeTotalCost, splitCosts, type CostSplit } from "@/lib/costs";
 import { toDateInputValue, todayInputValue } from "@/lib/dates";
 
 // Limiti teorici giornalieri per il controllo km autisti.
@@ -30,6 +30,10 @@ export type MonthlyStats = {
   pallets: number;
   routesCount: number;
   registeredCost: number;
+  /** Ripartizione del costo registrato: industriale vs padroncini. */
+  costSplit: CostSplit;
+  /** Noli dei carichi del mese (confluiscono nei costi esterni). */
+  noliCost: number;
   // --- medie giornaliere (sui giorni con operatività) ---
   operativeDays: number;
   avgVehiclesPerDay: number;
@@ -84,7 +88,7 @@ export async function getMonthlyStats(branchId: string, month: string): Promise<
   const elapsedEnd =
     todayDate < monthEnd ? (todayDate < monthStart ? monthStart : todayDate) : monthEnd;
 
-  const [routes, pickups, drivers, tractions] = await Promise.all([
+  const [routes, pickups, drivers, tractions, carichi] = await Promise.all([
     prisma.route.findMany({
       where: { branchId, routeDate: { gte: monthStart, lte: monthEnd } },
       include: routeInclude,
@@ -94,7 +98,8 @@ export async function getMonthlyStats(branchId: string, month: string): Promise<
       select: {
         pickupDate: true,
         pallets: true,
-        volumeM3: true,
+        // Volume "tassabile": solo il consuntivo arrivato dall'import AS400.
+        taxableVolumeM3: true,
         customerId: true,
         customer: { select: { name: true } },
       },
@@ -106,18 +111,44 @@ export async function getMonthlyStats(branchId: string, month: string): Promise<
     }),
     prisma.traction.findMany({
       where: { branchId, tractionDate: { gte: monthStart, lte: monthEnd } },
-      select: { tractionDate: true, cost: true, km: true, driverId: true },
+      select: {
+        tractionDate: true,
+        cost: true,
+        km: true,
+        driverId: true,
+        driver: { select: { industrialTractions: true } },
+      },
+    }),
+    // Noli dei carichi: costi di trazione esterni del mese.
+    prisma.carico.findMany({
+      where: { branchId, loadDate: { gte: monthStart, lte: monthEnd } },
+      select: { loadDate: true, nolo: true },
     }),
   ]);
 
   // --- Totali consuntivo ---
   const pickupsCount = pickups.length;
-  const volumeM3 = pickups.reduce((s, p) => s + (p.volumeM3 ?? 0), 0);
+  // Volume a consuntivo (tassabile), non il previsionale di pianificazione.
+  const volumeM3 = pickups.reduce((s, p) => s + (p.taxableVolumeM3 ?? 0), 0);
   const pallets = pickups.reduce((s, p) => s + (p.pallets ?? 0), 0);
   const routesCount = routes.length;
   const routesCost = routes.reduce((s, r) => s + (routeTotalCost(r) ?? 0), 0);
   const tractionsCost = tractions.reduce((s, t) => s + (t.cost ?? 0), 0);
-  const registeredCost = routesCost + tractionsCost;
+  const noliCost = carichi.reduce((s, c) => s + (c.nolo ?? 0), 0);
+  const registeredCost = routesCost + tractionsCost + noliCost;
+
+  // Ripartizione industriale / padroncini.
+  const costSplit = splitCosts({
+    routes: routes.map((r) => ({
+      cost: routeTotalCost(r) ?? 0,
+      industrial: r.driver?.industrialRoutes ?? false,
+    })),
+    tractions: tractions.map((t) => ({
+      cost: t.cost ?? 0,
+      industrial: t.driver?.industrialTractions ?? false,
+    })),
+    otherExternal: noliCost,
+  });
 
   // --- Aggregazioni per giorno (per le medie) ---
   const vehiclesByDay = new Map<string, Set<string>>();
@@ -135,6 +166,12 @@ export async function getMonthlyStats(branchId: string, month: string): Promise<
     if (t.cost == null) continue;
     const day = toDateInputValue(t.tractionDate);
     costByDay.set(day, (costByDay.get(day) ?? 0) + t.cost);
+  }
+  // I noli dei carichi entrano nel costo della giornata.
+  for (const c of carichi) {
+    if (c.nolo == null) continue;
+    const day = toDateInputValue(c.loadDate);
+    costByDay.set(day, (costByDay.get(day) ?? 0) + c.nolo);
   }
   const pickupsByDay = new Map<string, number>();
   for (const p of pickups) {
@@ -173,7 +210,7 @@ export async function getMonthlyStats(branchId: string, month: string): Promise<
   for (const p of pickups) {
     const entry = byCustomer.get(p.customerId) ?? { name: p.customer.name, count: 0, volume: 0 };
     entry.count += 1;
-    entry.volume += p.volumeM3 ?? 0;
+    entry.volume += p.taxableVolumeM3 ?? 0;
     byCustomer.set(p.customerId, entry);
   }
   const topCustomer =
@@ -232,6 +269,8 @@ export async function getMonthlyStats(branchId: string, month: string): Promise<
     pallets,
     routesCount,
     registeredCost,
+    costSplit,
+    noliCost,
     operativeDays,
     avgVehiclesPerDay,
     avgPickupsPerDay,

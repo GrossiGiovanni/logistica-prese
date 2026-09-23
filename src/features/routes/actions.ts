@@ -95,6 +95,46 @@ export async function createRoute(
   redirect(`/giri/${route.id}`);
 }
 
+/**
+ * Salvataggio automatico del giro come BOZZA.
+ * Usata dal form mentre l'operatore compila: se cambia pagina, i dati inseriti
+ * (autista, mezzo, fascia, orari, note) non vanno persi. Non reindirizza e non
+ * declassa un giro già confermato; alla prima chiamata crea la bozza e
+ * restituisce l'id, che il form riusa per i salvataggi successivi.
+ */
+export async function autosaveRouteDraft(
+  formData: FormData,
+): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const id = ((formData.get("id") as string) || "").trim();
+  const parsed = parseForm(routeSchema, formData);
+  if (!parsed.success) return { ok: false, error: "Dati non validi" };
+
+  const { routeDate, driverId, vehicleId, ...rest } = parsed.data;
+  const common = {
+    ...rest,
+    routeDate: parseDateOnly(routeDate),
+    driverId: driverId ?? null,
+    vehicleId: vehicleId ?? null,
+  };
+
+  try {
+    if (id) {
+      await prisma.route.update({ where: { id }, data: common });
+      revalidateRoutes(id);
+      return { ok: true, id };
+    }
+    // Primo salvataggio: crea la bozza solo quando c'è già qualcosa di utile.
+    if (!common.driverId && !common.vehicleId) return { ok: false };
+    const route = await prisma.route.create({
+      data: { ...common, status: "DRAFT", branchId: await requireBranchId() },
+    });
+    revalidateRoutes();
+    return { ok: true, id: route.id };
+  } catch {
+    return { ok: false, error: "Salvataggio non riuscito" };
+  }
+}
+
 /** Aggiorna autista/mezzo/fascia/stato/note del giro. */
 export async function updateRoute(
   _prev: ActionResult | null,

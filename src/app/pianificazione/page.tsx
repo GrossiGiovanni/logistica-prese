@@ -23,6 +23,7 @@ import {
   hasMissingData,
 } from "@/lib/warnings";
 import { routeTotalCost, formatEuro } from "@/lib/costs";
+import { getDailyCostSplit } from "@/features/reports/daily";
 import { routeShiftLabels, priorityLabels, routeLabel } from "@/lib/labels";
 import { formatDateIt, tomorrowInputValue, parseDateOnly, toDateInputValue } from "@/lib/dates";
 import { UnassignedFilters } from "@/features/pickups/UnassignedFilters";
@@ -73,6 +74,9 @@ export default async function PianificazionePage({
   // giri effettivamente impegnati (con almeno una presa): un giro vuoto non è in conflitto.
   const overlapIds = findResourceOverlaps(routes.filter((r) => r.stops.length > 0));
 
+  // Costi della giornata ripartiti (stessa logica dei report mensili).
+  const costs = await getDailyCostSplit(branchId, selectedDate);
+
   return (
     <div>
       <PageHeader
@@ -102,6 +106,25 @@ export default async function PianificazionePage({
         <KpiCard label="Mezzi usati" value={kpi.vehiclesUsed} />
         <KpiCard label="Motrici usate" value={kpi.motriciUsed} tone={kpi.motriciUsed > 0 ? "red" : "default"} />
       </KpiGrid>
+
+      {/* Costi della giornata, separati per tipologia */}
+      <div className="mt-3">
+        <KpiGrid>
+          <KpiCard
+            label="Costo padroncini"
+            value={costs.padroncini > 0 ? formatEuro(Math.round(costs.padroncini)) : "—"}
+          />
+          <KpiCard
+            label="Costo industriale"
+            value={costs.industrial > 0 ? formatEuro(Math.round(costs.industrial)) : "—"}
+          />
+          <KpiCard
+            label="Costo totale giornata"
+            value={costs.total > 0 ? formatEuro(Math.round(costs.total)) : "—"}
+            tone="blue"
+          />
+        </KpiGrid>
+      </div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* SINISTRA: prese non assegnate */}

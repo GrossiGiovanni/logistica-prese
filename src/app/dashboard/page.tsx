@@ -36,34 +36,50 @@ export default async function DashboardPage({
         </Link>
       </PageHeader>
 
-      {/* KPI principali del mese */}
+      {/* KPI operativi del mese */}
       <KpiGrid>
         <KpiCard
           label="Prese del mese"
           value={nf0.format(stats.pickupsCount)}
           hint={`≈ ${nf1.format(stats.avgPickupsPerDay)} / giorno operativo`}
         />
-        <KpiCard label="Volumi pianificati" value={volLabel(stats.volumeM3)} />
+        <KpiCard
+          label="Volume tassabile"
+          value={volLabel(stats.volumeM3)}
+          hint="Consuntivo da import AS400"
+        />
         <KpiCard label="Giri del mese" value={nf0.format(stats.routesCount)} />
-        <KpiCard
-          label="Costo raccolta previsto"
-          value={stats.projectedCost > 0 ? formatEuro(Math.round(stats.projectedCost)) : "—"}
-          tone="blue"
-          hint="Registrato + proiezione fine mese"
-        />
-        <KpiCard
-          label="Costo registrato"
-          value={stats.registeredCost > 0 ? formatEuro(Math.round(stats.registeredCost)) : "—"}
-        />
         <KpiCard label="Pallet del mese" value={nf0.format(stats.pallets)} />
-        <KpiCard
-          label="Mezzi medi / giorno"
-          value={nf1.format(stats.avgVehiclesPerDay)}
-        />
+        <KpiCard label="Mezzi medi / giorno" value={nf1.format(stats.avgVehiclesPerDay)} />
         <KpiCard
           label="Giorni operativi"
           value={`${stats.operativeDays} / ${stats.workdaysTotal}`}
           hint="Con attività / lavorativi"
+        />
+      </KpiGrid>
+
+      {/* Costi del mese, separati per tipologia */}
+      <h2 className="mb-2 mt-8 text-base font-semibold text-slate-900">Costi del mese</h2>
+      <KpiGrid>
+        <KpiCard
+          label="Costo padroncini"
+          value={stats.costSplit.padroncini > 0 ? formatEuro(Math.round(stats.costSplit.padroncini)) : "—"}
+          hint="Giri e trazioni esterni + noli"
+        />
+        <KpiCard
+          label="Costo industriale"
+          value={stats.costSplit.industrial > 0 ? formatEuro(Math.round(stats.costSplit.industrial)) : "—"}
+          hint="Autisti marcati in anagrafica"
+        />
+        <KpiCard
+          label="Costo totale"
+          value={stats.costSplit.total > 0 ? formatEuro(Math.round(stats.costSplit.total)) : "—"}
+          tone="blue"
+        />
+        <KpiCard
+          label="Costo raccolta previsto"
+          value={stats.projectedCost > 0 ? formatEuro(Math.round(stats.projectedCost)) : "—"}
+          hint="Registrato + proiezione fine mese"
         />
       </KpiGrid>
 
@@ -123,7 +139,7 @@ export default async function DashboardPage({
               <dd className="font-semibold text-slate-800">{nf0.format(Math.round(stats.projectedPickups))}</dd>
             </div>
             <div className="flex items-center justify-between">
-              <dt className="text-slate-500">Volumi previsti</dt>
+              <dt className="text-slate-500">Volume tassabile previsto</dt>
               <dd className="font-semibold text-slate-800">{volLabel(stats.projectedVolume)}</dd>
             </div>
             <div className="flex items-center justify-between">

@@ -37,10 +37,35 @@ export default async function ReportMensilePage({
       <KpiGrid>
         <KpiCard label="Mezzi utilizzati / giorno" value={nf1.format(stats.avgVehiclesPerDay)} />
         <KpiCard label="Prese effettuate / giorno" value={nf1.format(stats.avgPickupsPerDay)} />
-        <KpiCard label="Volume / giorno" value={volLabel(stats.avgVolumePerDay)} />
+        <KpiCard label="Volume tassabile / giorno" value={volLabel(stats.avgVolumePerDay)} />
         <KpiCard
           label="Costo medio / giorno"
           value={stats.avgCostPerDay > 0 ? formatEuro(Math.round(stats.avgCostPerDay)) : "—"}
+        />
+      </KpiGrid>
+
+      {/* Ripartizione costi del mese */}
+      <h2 className="mb-2 mt-8 text-base font-semibold text-slate-900">Costi del mese</h2>
+      <KpiGrid>
+        <KpiCard
+          label="Costo padroncini"
+          value={stats.costSplit.padroncini > 0 ? formatEuro(Math.round(stats.costSplit.padroncini)) : "—"}
+          hint="Giri e trazioni esterni + noli"
+        />
+        <KpiCard
+          label="Costo industriale"
+          value={stats.costSplit.industrial > 0 ? formatEuro(Math.round(stats.costSplit.industrial)) : "—"}
+          hint="Autisti marcati in anagrafica"
+        />
+        <KpiCard
+          label="Costo totale"
+          value={stats.costSplit.total > 0 ? formatEuro(Math.round(stats.costSplit.total)) : "—"}
+          tone="blue"
+        />
+        <KpiCard
+          label="di cui noli carichi"
+          value={stats.noliCost > 0 ? formatEuro(Math.round(stats.noliCost)) : "—"}
+          hint="Trazioni registrate nei Carichi"
         />
       </KpiGrid>
 

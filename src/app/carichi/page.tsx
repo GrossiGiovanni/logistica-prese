@@ -1,10 +1,14 @@
 // "Carichi": gestione manuale delle informazioni di carico per il magazzino.
 // Schermata scollegata da prese e giri (nessun legame con la pianificazione).
+// Il nolo viene precompilato dall'anagrafica trazionisti e alimenta i costi
+// mensili delle trazioni.
 
+import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { NewCaricoForm, CaricoRow } from "@/features/carichi/CaricoRow";
 import { prisma } from "@/lib/db";
 import { requireBranchId } from "@/lib/branch";
+import { formatEuro } from "@/lib/costs";
 import {
   formatDateIt,
   todayInputValue,
@@ -26,7 +30,7 @@ export default async function CarichiPage({
   const to = sp.to && isValidDateInput(sp.to) ? sp.to : todayInputValue();
   const carrier = (sp.carrier ?? "").trim();
 
-  const [carichi, allCarriers] = await Promise.all([
+  const [carichi, trazionisti] = await Promise.all([
     prisma.carico.findMany({
       where: {
         branchId,
@@ -35,19 +39,15 @@ export default async function CarichiPage({
       },
       orderBy: [{ loadDate: "desc" }, { createdAt: "asc" }],
     }),
-    // Vettori già usati, per l'autocompletamento del campo.
-    prisma.carico.findMany({
-      where: { branchId },
-      select: { carrier: true },
-      distinct: ["carrier"],
-      orderBy: { carrier: "asc" },
+    prisma.trazionista.findMany({
+      where: { branchId, active: true },
+      select: { id: true, name: true, defaultCost: true },
+      orderBy: { name: "asc" },
     }),
   ]);
 
   const back = `from=${from}&to=${to}${carrier ? `&carrier=${encodeURIComponent(carrier)}` : ""}`;
-  const carriers = allCarriers.map((c) => c.carrier);
-  const totPallets = carichi.reduce((s, c) => s + (c.pallets ?? 0), 0);
-  const totColli = carichi.reduce((s, c) => s + (c.colli ?? 0), 0);
+  const totNolo = carichi.reduce((s, c) => s + (c.nolo ?? 0), 0);
 
   return (
     <div>
@@ -62,6 +62,14 @@ export default async function CarichiPage({
           Export Excel
         </a>
       </PageHeader>
+
+      {trazionisti.length === 0 ? (
+        <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+          Nessun trazionista in anagrafica: aggiungine uno in{" "}
+          <Link href="/trazionisti" className="font-medium underline">Anagrafica → Trazionisti</Link>{" "}
+          per poter selezionare il vettore e precompilare il nolo.
+        </p>
+      ) : null}
 
       {/* Filtri: data + vettore */}
       <form method="get" className="card mb-4 flex flex-wrap items-end gap-3 p-3">
@@ -83,7 +91,7 @@ export default async function CarichiPage({
             className="field-input w-48"
           />
           <datalist id="carichi-filtro-vettori">
-            {carriers.map((v) => <option key={v} value={v} />)}
+            {trazionisti.map((t) => <option key={t.id} value={t.name} />)}
           </datalist>
         </div>
         <div className="flex gap-2">
@@ -93,7 +101,7 @@ export default async function CarichiPage({
       </form>
 
       {/* Inserimento nuovo carico */}
-      <NewCaricoForm carriers={carriers} back={back} />
+      <NewCaricoForm trazionisti={trazionisti} back={back} />
 
       {sp.error === "campi" ? (
         <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -103,8 +111,7 @@ export default async function CarichiPage({
 
       <h2 className="mb-2 text-base font-semibold text-slate-900">
         Carichi dal {formatDateIt(parseDateOnly(from))} al {formatDateIt(parseDateOnly(to))} ({carichi.length})
-        {totPallets > 0 ? ` · ${totPallets} pallet` : ""}
-        {totColli > 0 ? ` · ${totColli} colli` : ""}
+        {totNolo > 0 ? ` · noli ${formatEuro(totNolo)}` : ""}
       </h2>
 
       {carichi.length === 0 ? (
@@ -118,14 +125,8 @@ export default async function CarichiPage({
               <tr>
                 <th className="px-3 py-2">Data</th>
                 <th className="px-3 py-2">Vettore</th>
-                <th className="px-3 py-2">Targa</th>
-                <th className="px-3 py-2">Destinazione</th>
-                <th className="px-3 py-2">Riferimento</th>
-                <th className="px-3 py-2">Pallet</th>
-                <th className="px-3 py-2">Colli</th>
-                <th className="px-3 py-2">Peso</th>
-                <th className="px-3 py-2">Volume</th>
                 <th className="px-3 py-2">Note di carico</th>
+                <th className="px-3 py-2">Nolo</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
@@ -133,20 +134,15 @@ export default async function CarichiPage({
               {carichi.map((c) => (
                 <CaricoRow
                   key={c.id}
-                  carriers={carriers}
+                  trazionisti={trazionisti}
                   back={back}
                   c={{
                     id: c.id,
                     dateInput: toDateInputValue(c.loadDate),
                     dayLabel: formatDateIt(c.loadDate),
                     carrier: c.carrier,
-                    plate: c.plate,
-                    destination: c.destination,
-                    reference: c.reference,
-                    pallets: c.pallets,
-                    colli: c.colli,
-                    weightKg: c.weightKg,
-                    volumeM3: c.volumeM3,
+                    trazionistaId: c.trazionistaId,
+                    nolo: c.nolo,
                     notes: c.notes,
                   }}
                 />

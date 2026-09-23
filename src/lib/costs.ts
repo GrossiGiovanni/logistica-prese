@@ -38,6 +38,28 @@ export function routeTotalCost(route: RouteCostInput): number | null {
   return (fixed ?? 0) + (km ?? 0);
 }
 
+/**
+ * Ripartizione dei costi tra "industriale" e "padroncini".
+ * Industriale = costi degli autisti marcati come tali in anagrafica
+ * (flag separati per giri e trazioni). Padroncini = tutto il resto dei costi
+ * esterni: calcolato come differenza dal totale, così non ci sono doppi conteggi.
+ */
+export type CostSplit = { industrial: number; padroncini: number; total: number };
+
+export function splitCosts(args: {
+  routes: { cost: number; industrial: boolean }[];
+  tractions: { cost: number; industrial: boolean }[];
+  /** Altri costi esterni (es. noli dei carichi): sempre lato padroncini. */
+  otherExternal?: number;
+}): CostSplit {
+  const sum = (xs: { cost: number }[]) => xs.reduce((s, x) => s + x.cost, 0);
+  const industrial =
+    sum(args.routes.filter((r) => r.industrial)) +
+    sum(args.tractions.filter((t) => t.industrial));
+  const total = sum(args.routes) + sum(args.tractions) + (args.otherExternal ?? 0);
+  return { industrial, padroncini: total - industrial, total };
+}
+
 const euro = new Intl.NumberFormat("it-IT", {
   style: "currency",
   currency: "EUR",

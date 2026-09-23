@@ -57,6 +57,24 @@ export function DriverForm({
             />
           </div>
         </Field>
+        <Field
+          label="Ripartizione costi"
+          hint="Se spuntati, questi costi rientrano nel «Costo industriale»; altrimenti nei padroncini."
+          full
+        >
+          <div className="flex flex-wrap gap-6 pt-2">
+            <CheckboxField
+              label="Giri a costo industriale"
+              name="industrialRoutes"
+              defaultChecked={driver?.industrialRoutes ?? false}
+            />
+            <CheckboxField
+              label="Trazioni a costo industriale"
+              name="industrialTractions"
+              defaultChecked={driver?.industrialTractions ?? false}
+            />
+          </div>
+        </Field>
         <Field label="Note" htmlFor="notes" error={errors?.notes} full>
           <textarea id="notes" name="notes" defaultValue={driver?.notes ?? ""} rows={2} className="field-input" />
         </Field>

@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useRef, useEffect, useCallback } from "react";
 import type { Route, Driver, Vehicle } from "@prisma/client";
-import { createRoute, updateRoute } from "./actions";
+import { createRoute, updateRoute, autosaveRouteDraft } from "./actions";
 import { FormSection, Field } from "@/components/forms/FormSection";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { routeShiftLabels, routeStatusLabels, vehicleTypeLabels, toOptions } from "@/lib/labels";
@@ -20,8 +20,23 @@ export function RouteForm({
   vehicles: Pick<Vehicle, "id" | "name" | "vehicleType">[];
   defaultDate: string;
 }) {
-  const action = route ? updateRoute : createRoute;
-  const [state, formAction] = useActionState<ActionResult | null, FormData>(action, null);
+  // L'id vive in un ref perché serve dentro callback stabili (autosave e submit).
+  const draftIdRef = useRef(route?.id ?? "");
+
+  // Se l'autosave ha già creato la bozza, il submit deve AGGIORNARE quel giro,
+  // altrimenti si creerebbe un doppione.
+  const submitAction = useCallback(
+    async (prev: ActionResult | null, fd: FormData): Promise<ActionResult> => {
+      const id = draftIdRef.current;
+      if (id) {
+        fd.set("id", id);
+        return updateRoute(prev, fd);
+      }
+      return createRoute(prev, fd);
+    },
+    [],
+  );
+  const [state, formAction] = useActionState<ActionResult | null, FormData>(submitAction, null);
   const errors = state && !state.ok ? state.fieldErrors : undefined;
 
   // Abbinamento fisso autista <-> mezzo: scelto l'uno, propone l'altro.
@@ -36,15 +51,56 @@ export function RouteForm({
   const [driverId, setDriverId] = useState(route?.driverId ?? "");
   const [vehicleId, setVehicleId] = useState(route?.vehicleId ?? "");
 
+  // --- Salvataggio automatico in BOZZA ---------------------------------
+  // Se l'operatore cambia pagina mentre compila, il giro non va perso: viene
+  // salvato come bozza e ritrovato esattamente com'era.
+  const formRef = useRef<HTMLFormElement>(null);
+  const [draftId, setDraftId] = useState(route?.id ?? "");
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const saveDraft = useCallback(async () => {
+    const form = formRef.current;
+    if (!form) return;
+    const fd = new FormData(form);
+    if (draftIdRef.current) fd.set("id", draftIdRef.current);
+    setSaving(true);
+    const res = await autosaveRouteDraft(fd);
+    setSaving(false);
+    if (res.ok) {
+      if (res.id && !draftIdRef.current) {
+        draftIdRef.current = res.id;
+        setDraftId(res.id);
+      }
+      setSavedAt(new Date().toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }));
+    }
+  }, []);
+
+  /** Programma un salvataggio dopo una breve pausa dalla digitazione. */
+  const scheduleSave = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => void saveDraft(), 800);
+  }, [saveDraft]);
+
+  // Salva anche se la pagina viene chiusa/abbandonata di colpo.
+  useEffect(() => {
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, []);
+
   function onDriverChange(next: string) {
     setDriverId(next);
     const v = driverToVehicle.get(next);
     if (v) setVehicleId(v); // propone il mezzo predefinito dell'autista
+    scheduleSave();
   }
   function onVehicleChange(next: string) {
     setVehicleId(next);
     const d = vehicleToDriver.get(next);
     if (d) setDriverId(d); // propone l'autista associato al mezzo
+    scheduleSave();
   }
 
   // Nome giro generato automaticamente: "Autista / Mezzo".
@@ -52,8 +108,14 @@ export function RouteForm({
   const vehicleName = vehicles.find((v) => v.id === vehicleId)?.name ?? "Mezzo da assegnare";
 
   return (
-    <form action={formAction} className="space-y-4">
-      {route ? <input type="hidden" name="id" value={route.id} /> : null}
+    <form
+      ref={formRef}
+      action={formAction}
+      onChange={scheduleSave}
+      onBlur={scheduleSave}
+      className="space-y-4"
+    >
+      {draftId ? <input type="hidden" name="id" value={draftId} /> : null}
 
       <div className="rounded-lg border border-brand-200 bg-brand-50 px-4 py-2 text-sm">
         <span className="text-slate-500">Nome giro: </span>
@@ -129,11 +191,25 @@ export function RouteForm({
       {state && !state.ok ? <p className="text-sm text-red-600">{state.error}</p> : null}
       {state && state.ok ? <p className="text-sm text-emerald-600">Modifiche salvate.</p> : null}
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <ConfirmButton variant="primary">
-          {route ? "Salva modifiche" : "Crea giro"}
+          {draftId ? "Salva modifiche" : "Crea giro"}
         </ConfirmButton>
+        {draftId && !route ? (
+          <a href={`/giri/${draftId}`} className="btn-secondary">
+            Apri giro (assegna prese)
+          </a>
+        ) : null}
         <a href="/giri" className="btn-secondary">Indietro</a>
+
+        {/* Stato del salvataggio automatico in bozza */}
+        <span className="ml-auto text-xs text-slate-400">
+          {saving
+            ? "Salvataggio bozza…"
+            : savedAt
+              ? `Bozza salvata alle ${savedAt}`
+              : "Le modifiche vengono salvate automaticamente in bozza"}
+        </span>
       </div>
     </form>
   );

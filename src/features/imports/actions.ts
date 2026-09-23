@@ -197,7 +197,9 @@ export async function confirmImport(preview: ImportPreview): Promise<ImportResul
           where: { id: target.id },
           data: {
             ...(r.weightKg != null ? { weightKg: r.weightKg } : {}),
-            ...(r.volumeM3 != null ? { volumeM3: r.volumeM3 } : {}),
+            // Volume del consuntivo AS400: è questo il "volume tassabile" su cui
+            // si basano i KPI della Home (non il previsionale di pianificazione).
+            ...(r.volumeM3 != null ? { volumeM3: r.volumeM3, taxableVolumeM3: r.volumeM3 } : {}),
             ...(r.colli != null ? { colli: r.colli } : {}),
             // Dati mancanti: riempiti solo se assenti sulla presa.
             ...(target.pallets == null && r.pallets != null ? { pallets: r.pallets } : {}),
