@@ -55,7 +55,7 @@ export default async function ReportMensilePage({
         <KpiCard
           label="Costo industriale"
           value={stats.costSplit.industrial > 0 ? formatEuro(Math.round(stats.costSplit.industrial)) : "—"}
-          hint="Autisti marcati in anagrafica"
+          hint="Giri e trazioni autisti Eurosarda"
         />
         <KpiCard
           label="Costo totale"

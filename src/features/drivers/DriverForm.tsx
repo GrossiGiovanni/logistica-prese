@@ -47,31 +47,16 @@ export function DriverForm({
             ))}
           </select>
         </Field>
-        <Field label="Stato">
+        <Field
+          label="Stato"
+          hint="«Autista Eurosarda» = flotta propria: i suoi costi (giri e trazioni) sono conteggiati come costo industriale, gli altri come padroncini."
+        >
           <div className="flex flex-wrap gap-6 pt-2">
             <CheckboxField label="Attivo" name="active" defaultChecked={driver?.active ?? true} />
             <CheckboxField
               label="Autista Eurosarda"
               name="isEurosarda"
               defaultChecked={driver?.isEurosarda ?? false}
-            />
-          </div>
-        </Field>
-        <Field
-          label="Ripartizione costi"
-          hint="Se spuntati, questi costi rientrano nel «Costo industriale»; altrimenti nei padroncini."
-          full
-        >
-          <div className="flex flex-wrap gap-6 pt-2">
-            <CheckboxField
-              label="Giri a costo industriale"
-              name="industrialRoutes"
-              defaultChecked={driver?.industrialRoutes ?? false}
-            />
-            <CheckboxField
-              label="Trazioni a costo industriale"
-              name="industrialTractions"
-              defaultChecked={driver?.industrialTractions ?? false}
             />
           </div>
         </Field>

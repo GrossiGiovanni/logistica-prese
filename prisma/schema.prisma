@@ -162,11 +162,10 @@ model Driver {
   code             String?
   phone            String? // Telefono/WhatsApp in formato internazionale (es. +39...)
   whatsappEnabled  Boolean  @default(true)
-  isEurosarda      Boolean  @default(false) // compare nella sezione "Autisti Eurosarda"
-  // Ripartizione costi: quali costi di questo autista sono "industriali"
-  // (il resto confluisce nei padroncini). Configurabili da anagrafica.
-  industrialRoutes    Boolean @default(false) // i suoi GIRI sono costo industriale
-  industrialTractions Boolean @default(false) // le sue TRAZIONI sono costo industriale
+  // Autista Eurosarda (flotta propria): compare nella sezione dedicata e i suoi
+  // costi (giri e trazioni) sono classificati come "industriali"; gli altri
+  // autisti sono padroncini/esterni.
+  isEurosarda      Boolean  @default(false)
   defaultVehicleId String?
   active           Boolean  @default(true)
   notes            String?

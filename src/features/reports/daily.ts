@@ -17,12 +17,12 @@ export async function getDailyCostSplit(branchId: string, dateStr: string): Prom
         shift: true,
         km: true,
         vehicle: { select: { dailyCost: true, costPerKm: true } },
-        driver: { select: { industrialRoutes: true } },
+        driver: { select: { isEurosarda: true } },
       },
     }),
     prisma.traction.findMany({
       where: { branchId, tractionDate: date },
-      select: { cost: true, driver: { select: { industrialTractions: true } } },
+      select: { cost: true, driver: { select: { isEurosarda: true } } },
     }),
     prisma.carico.findMany({
       where: { branchId, loadDate: date },
@@ -33,11 +33,11 @@ export async function getDailyCostSplit(branchId: string, dateStr: string): Prom
   return splitCosts({
     routes: routes.map((r) => ({
       cost: routeTotalCost(r) ?? 0,
-      industrial: r.driver?.industrialRoutes ?? false,
+      industrial: r.driver?.isEurosarda ?? false,
     })),
     tractions: tractions.map((t) => ({
       cost: t.cost ?? 0,
-      industrial: t.driver?.industrialTractions ?? false,
+      industrial: t.driver?.isEurosarda ?? false,
     })),
     otherExternal: carichi.reduce((s, c) => s + (c.nolo ?? 0), 0),
   });

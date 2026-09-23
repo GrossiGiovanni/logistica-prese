@@ -116,7 +116,7 @@ export async function getMonthlyStats(branchId: string, month: string): Promise<
         cost: true,
         km: true,
         driverId: true,
-        driver: { select: { industrialTractions: true } },
+        driver: { select: { isEurosarda: true } },
       },
     }),
     // Noli dei carichi: costi di trazione esterni del mese.
@@ -137,15 +137,15 @@ export async function getMonthlyStats(branchId: string, month: string): Promise<
   const noliCost = carichi.reduce((s, c) => s + (c.nolo ?? 0), 0);
   const registeredCost = routesCost + tractionsCost + noliCost;
 
-  // Ripartizione industriale / padroncini.
+  // Ripartizione industriale / padroncini: industriale = flotta Eurosarda.
   const costSplit = splitCosts({
     routes: routes.map((r) => ({
       cost: routeTotalCost(r) ?? 0,
-      industrial: r.driver?.industrialRoutes ?? false,
+      industrial: r.driver?.isEurosarda ?? false,
     })),
     tractions: tractions.map((t) => ({
       cost: t.cost ?? 0,
-      industrial: t.driver?.industrialTractions ?? false,
+      industrial: t.driver?.isEurosarda ?? false,
     })),
     otherExternal: noliCost,
   });
