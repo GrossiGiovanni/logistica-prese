@@ -1,12 +1,23 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Logo } from "@/components/layout/Logo";
 
+// useSearchParams richiede un confine Suspense (Next 15).
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  // Rientro richiesto dal cambio password (sessione troppo vecchia).
+  const riaccesso = useSearchParams().get("motivo") === "riaccesso";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +61,11 @@ export default function LoginPage() {
           </p>
         ) : (
           <form onSubmit={onSubmit} className="space-y-3">
+            {riaccesso ? (
+              <p className="rounded-md border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-700">
+                Per sicurezza accedi di nuovo: subito dopo potrai impostare la nuova password.
+              </p>
+            ) : null}
             <div>
               <label className="field-label" htmlFor="email">Email</label>
               <input

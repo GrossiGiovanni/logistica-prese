@@ -4,7 +4,7 @@ import { updateSession } from "@/lib/supabase/middleware";
 // Nota: "branch" deve combaciare con BRANCH_COOKIE in src/lib/branch.ts.
 // Qui usiamo la stringa letterale per non importare Prisma nell'edge runtime.
 const BRANCH_COOKIE = "branch";
-const BRANCH_EXEMPT = ["/login", "/scegli-filiale"];
+const BRANCH_EXEMPT = ["/login", "/scegli-filiale", "/cambia-password"];
 
 export async function middleware(request: NextRequest) {
   const res = await updateSession(request);

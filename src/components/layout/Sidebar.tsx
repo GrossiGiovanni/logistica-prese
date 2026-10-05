@@ -61,7 +61,7 @@ function isActive(pathname: string, href: string): boolean {
 const linkClass = (active: boolean, nested = false) =>
   "block rounded-md py-2 text-sm font-medium transition " +
   (nested ? "px-3 pl-6 " : "px-3 ") +
-  (active ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-100");
+  (active ? "bg-white/15 text-white" : "text-white hover:bg-white/10");
 
 function NavGroup({ label, links }: { label: string; links: NavLink[] }) {
   const pathname = usePathname();
@@ -75,7 +75,7 @@ function NavGroup({ label, links }: { label: string; links: NavLink[] }) {
         onClick={() => setOpen((o) => !o)}
         className={
           "flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition " +
-          (hasActive ? "text-brand-700" : "text-slate-600 hover:bg-slate-100")
+          (hasActive ? "text-white" : "text-white hover:bg-white/10")
         }
       >
         <span>{label}</span>
@@ -97,29 +97,33 @@ function NavGroup({ label, links }: { label: string; links: NavLink[] }) {
 export function Sidebar({ userEmail, branch }: { userEmail?: string; branch?: BranchInfo | null }) {
   const pathname = usePathname();
 
-  // Niente sidebar nella pagina di login o nella scelta filiale.
-  if (pathname === "/login" || pathname === "/scegli-filiale") return null;
+  // Niente sidebar nella pagina di login, nella scelta filiale e nel cambio password.
+  if (pathname === "/login" || pathname === "/scegli-filiale" || pathname === "/cambia-password") {
+    return null;
+  }
 
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-slate-200 bg-white">
-      <div className="border-b border-slate-200 px-4 pb-3 pt-4">
-        <Logo className="w-full" />
-        <div className="mt-1 text-center text-[11px] font-medium uppercase tracking-widest text-slate-400">
+    <aside className="flex w-56 shrink-0 flex-col border-r border-brand-950 bg-brand-900 text-white">
+      <div className="border-b border-white/10 px-3 pb-3 pt-3">
+        <div className="rounded-md bg-white px-2 py-2">
+          <Logo className="w-full" />
+        </div>
+        <div className="mt-2 text-center text-[11px] font-medium uppercase tracking-widest text-brand-200">
           Pianificazione ritiri
         </div>
       </div>
 
       {branch ? (
-        <div className="border-b border-slate-200 px-3 py-2">
-          <div className="flex items-center justify-between rounded-md bg-brand-50 px-2.5 py-1.5">
+        <div className="border-b border-white/10 px-3 py-2">
+          <div className="flex items-center justify-between rounded-md bg-white/10 px-2.5 py-1.5">
             <div className="min-w-0">
-              <div className="text-[10px] font-medium uppercase tracking-wide text-brand-500">Filiale</div>
-              <div className="truncate text-sm font-semibold text-brand-700">{branch.name}</div>
+              <div className="text-[10px] font-medium uppercase tracking-wide text-brand-200">Filiale</div>
+              <div className="truncate text-sm font-semibold text-white">{branch.name}</div>
             </div>
             <form action={switchBranch}>
               <button
                 type="submit"
-                className="rounded-md px-2 py-1 text-xs font-medium text-brand-600 transition hover:bg-brand-100"
+                className="rounded-md px-2 py-1 text-xs font-medium text-white transition hover:bg-white/15"
                 title="Cambia filiale"
               >
                 Cambia
@@ -139,14 +143,14 @@ export function Sidebar({ userEmail, branch }: { userEmail?: string; branch?: Br
           ),
         )}
       </nav>
-      <div className="border-t border-slate-200 px-4 py-3">
+      <div className="border-t border-white/10 px-4 py-3">
         {userEmail ? (
-          <div className="mb-2 truncate text-xs text-slate-500" title={userEmail}>
+          <div className="mb-2 truncate text-xs text-brand-200" title={userEmail}>
             {userEmail}
           </div>
         ) : null}
         <form action={signOut}>
-          <button type="submit" className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-slate-600 transition hover:bg-slate-100">
+          <button type="submit" className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-white transition hover:bg-white/10">
             Esci
           </button>
         </form>

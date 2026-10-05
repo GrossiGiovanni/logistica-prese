@@ -36,3 +36,8 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# Backup ed archivi del database: contengono dati reali e hash delle password.
+# Non devono MAI finire su git.
+/backups/
+*.dump

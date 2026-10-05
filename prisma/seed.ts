@@ -1,7 +1,15 @@
 // Seed dati demo — dati fittizi ma realistici (province lombarde).
+// SOLO PER SVILUPPO/TEST: svuota le tabelle prima di ricrearle.
 // Eseguito con: npm run db:seed  (prisma -> tsx prisma/seed.ts)
+//
+// Protezione: la guardia qui sotto rifiuta di partire contro la produzione e
+// contro qualsiasi database remoto non autorizzato esplicitamente (vedi guard.ts).
 
 import { PrismaClient } from "@prisma/client";
+import { guardOrExit } from "./guard";
+
+// Controllo ambiente/database PRIMA di qualsiasi deleteMany o reset.
+guardOrExit("seed");
 
 const prisma = new PrismaClient();
 

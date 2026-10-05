@@ -17,6 +17,10 @@ const config: Config = {
           500: "#3d4fae",
           600: "#2b3990",
           700: "#222d73",
+          // Tonalità scure per il menu laterale (blu notte coerente col logo).
+          800: "#1a2259",
+          900: "#131a45",
+          950: "#0c1131",
         },
       },
     },

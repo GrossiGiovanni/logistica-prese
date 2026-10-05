@@ -6,9 +6,16 @@
 // corrispondono (mittente+località) alla lista fissa sono taggate sourceType=RECURRING.
 //
 // Esecuzione: npx tsx prisma/import-cliente.ts
+//
+// ATTENZIONE: è un RESET (svuota le tabelle). Usato solo per il primo caricamento:
+// la guardia rifiuta di partire contro la produzione (vedi guard.ts).
 import { PrismaClient, type VehicleType, type CostLevel } from "@prisma/client";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { guardOrExit } from "./guard";
+
+// Controllo ambiente/database PRIMA di qualsiasi deleteMany o reset.
+guardOrExit("import-cliente");
 
 const prisma = new PrismaClient();
 const BUNDLE = join(__dirname, "seed-data", "bundle.json");
