@@ -1,5 +1,6 @@
 // Anagrafica trazionisti: vettori di trazione con il loro nolo predefinito.
-// Il nolo qui impostato precompila il campo "Nolo" dei Carichi.
+// Il nolo qui impostato precompila il campo "Nolo" dei Carichi. I vettori
+// marcati "Eurosarda" fanno trazioni industriali (nolo nel Costo Industriale).
 
 import { PageHeader } from "@/components/ui/PageHeader";
 import { NewTrazionistaForm, TrazionistaRow } from "@/features/trazionisti/TrazionistaRow";
@@ -74,6 +75,7 @@ export default async function TrazionistiPage({
                     defaultCost: t.defaultCost,
                     notes: t.notes,
                     active: t.active,
+                    isEurosarda: t.isEurosarda,
                     carichiCount: t._count.carichi,
                   }}
                 />

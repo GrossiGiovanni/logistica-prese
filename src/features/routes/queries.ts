@@ -38,6 +38,17 @@ export function listRoutes(branchId: string, date?: string) {
   });
 }
 
+/**
+ * Tutti i giri di una giornata, nella forma minima che serve ai warning
+ * "autista/mezzo già impegnato" (getRouteWarnings(route, dayRoutes)).
+ */
+export function listDayRoutesForWarnings(branchId: string, date: Date) {
+  return prisma.route.findMany({
+    where: { branchId, routeDate: date },
+    select: { id: true, shift: true, driverId: true, vehicleId: true, stops: { select: { id: true } } },
+  });
+}
+
 export function getRoute(branchId: string, id: string) {
   return prisma.route.findFirst({ where: { id, branchId }, include: routeInclude });
 }

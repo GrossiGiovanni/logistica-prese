@@ -1,12 +1,16 @@
 // Test dei calcoli del report mensile (consuntivo, forecast, costi, totali).
+// Le trazioni sono SOLO i Carichi: un carico fatto da Eurosarda (autista
+// Eurosarda o vettore Eurosarda) è una trazione industriale (Costo Industriale);
+// gli altri carichi sono noli esterni.
 // Esecuzione: npm test
 //
 // Scenario base: ottobre 2026, oggi = martedì 06/10/2026.
 // Giorni lavorativi del mese: 22; trascorsi (01,02,05,06): 4; rimanenti: 18.
 
-import { test, describe } from "node:test";
+import { test, describe } from "vitest";
 import assert from "node:assert/strict";
 import { computeMonthlyStats, computeCostBreakdown, type MonthlyInput } from "./monthly-calc";
+import { costLines } from "@/lib/costs";
 import { parseDateOnly } from "@/lib/dates";
 
 const d = parseDateOnly;
@@ -26,7 +30,7 @@ function pickup(id: string, date: string, over: Partial<MonthlyInput["monthPicku
   return {
     id,
     pickupDate: d(date),
-    status: "PLANNED" as const,
+    cancelledAt: null as Date | null,
     pallets: null as number | null,
     loadingMeters: null as number | null,
     taxableVolumeM3: null as number | null,
@@ -71,8 +75,8 @@ const p3 = pickup("p3", "2026-10-02", { pallets: 5, taxableVolumeM3: 10 });
 const p4 = pickup("p4", "2026-10-05", { pallets: 6, taxableVolumeM3: 12 });
 const p5 = pickup("p5", "2026-10-06", { pallets: 3, inConfirmedRoute: false }); // solo in bozza
 const p6 = pickup("p6", "2026-10-08", { pallets: 4 }); // futura, già pianificata
-const p7 = pickup("p7", "2026-10-05", { pallets: 2, inConfirmedRoute: false, status: "READY" });
-const p8 = pickup("p8", "2026-10-02", { pallets: 9, status: "CANCELLED", inConfirmedRoute: false });
+const p7 = pickup("p7", "2026-10-05", { pallets: 2, inConfirmedRoute: false });
+const p8 = pickup("p8", "2026-10-02", { pallets: 9, cancelledAt: new Date("2026-10-01T10:00:00Z"), inConfirmedRoute: false });
 const p9 = pickup("p9", "2026-09-30", { pallets: 7, taxableVolumeM3: 30 }); // giro di settembre
 
 function baseInput(over: Partial<MonthlyInput> = {}): MonthlyInput {
@@ -88,13 +92,13 @@ function baseInput(over: Partial<MonthlyInput> = {}): MonthlyInput {
       route("r5", "2026-10-08", "R", "bilico", [p6]),
     ],
     monthPickups: [p1, p3, p4, p5, p6, p7, p8],
-    tractions: [
-      { tractionDate: d("2026-10-02"), cost: 200, km: 150, driverId: "E" },
-      { tractionDate: d("2026-10-12"), cost: 250, km: 90, driverId: "E" },
-    ],
     carichi: [
-      { loadDate: d("2026-10-05"), nolo: 500 },
-      { loadDate: d("2026-10-20"), nolo: 600 },
+      // Trazioni industriali: carichi fatti da un autista Eurosarda.
+      { loadDate: d("2026-10-02"), nolo: 200, driver: { company: "EUROSARDA" }, trazionista: null },
+      { loadDate: d("2026-10-12"), nolo: 250, driver: { company: "EUROSARDA" }, trazionista: null },
+      // Noli esterni: altri vettori.
+      { loadDate: d("2026-10-05"), nolo: 500, driver: null, trazionista: { isEurosarda: false } },
+      { loadDate: d("2026-10-20"), nolo: 600, driver: null, trazionista: { isEurosarda: false } },
     ],
     drivers: [
       { id: "E", name: "Eurosarda Uno", active: true, defaultVehicle: { vehicleType: "BILICO" } },
@@ -115,10 +119,10 @@ describe("1. Consuntivo: solo dati fino a oggi", () => {
     close(s.costs.total, 400 + 150 + 400 + 200 + 500, "costo registrato");
   });
 
-  test("trazioni e noli futuri non entrano nel registrato", () => {
+  test("trazioni industriali e noli futuri non entrano nel registrato", () => {
     const s = computeMonthlyStats(baseInput());
-    close(s.costs.trazioni, 200);
-    close(s.costs.noli, 500);
+    close(s.costs.trazioniIndustriali, 200);
+    close(s.costs.noliEsterni, 500);
   });
 });
 
@@ -173,13 +177,13 @@ describe("4. Forecast", () => {
     close(s.projectedVolume, 57 + 14.25 + 17 * 14.25, "volume previsto");
     // raccolta: 950 registrato, media 237,5; 08/10 pianificato 400.
     close(s.projectedCosts.raccolta, 950 + 400 + 17 * 237.5, "raccolta prevista");
-    // trazioni: 200, media 50; 12/10 pianificata 250.
-    close(s.projectedCosts.trazioni, 200 + 250 + 17 * 50, "trazioni previste");
-    // noli: 500, media 125; 20/10 pianificato 600.
-    close(s.projectedCosts.noli, 500 + 600 + 17 * 125, "noli previsti");
+    // trazioni industriali: 200, media 50; 12/10 pianificata 250.
+    close(s.projectedCosts.trazioniIndustriali, 200 + 250 + 17 * 50, "trazioni previste");
+    // noli esterni: 500, media 125; 20/10 pianificato 600.
+    close(s.projectedCosts.noliEsterni, 500 + 600 + 17 * 125, "noli previsti");
     close(
       s.projectedCosts.total,
-      s.projectedCosts.raccolta + s.projectedCosts.trazioni + s.projectedCosts.noli,
+      s.projectedCosts.raccolta + s.projectedCosts.trazioniIndustriali + s.projectedCosts.noliEsterni,
     );
   });
 
@@ -192,7 +196,7 @@ describe("4. Forecast", () => {
   });
 
   test("mese futuro: niente registrato, forecast = solo pianificato, nessun NaN", () => {
-    const s = computeMonthlyStats(baseInput({ month: "2026-11", routes: [], tractions: [], carichi: [], monthPickups: [] }));
+    const s = computeMonthlyStats(baseInput({ month: "2026-11", routes: [], carichi: [], monthPickups: [] }));
     assert.equal(s.workdaysElapsed, 0);
     assert.equal(s.pickupsCount, 0);
     close(s.projectedPickups, 0);
@@ -201,20 +205,34 @@ describe("4. Forecast", () => {
 });
 
 describe("5. Costi separati", () => {
-  test("Rama, Omar, Industriale ritiri, trazioni, noli", () => {
+  test("Rama, Omar, Industriale ritiri, trazioni industriali, noli esterni", () => {
     const s = computeMonthlyStats(baseInput());
     close(s.costs.rama, 400);
     close(s.costs.omar, 150); // motrice 300 × mezza giornata
     close(s.costs.industrialeRitiri, 400);
-    close(s.costs.trazioni, 200);
-    close(s.costs.noli, 500);
+    close(s.costs.trazioniIndustriali, 200);
+    close(s.costs.noliEsterni, 500);
   });
 
-  test("raccolta = Rama + Omar + Industriale ritiri, trazioni separate", () => {
+  test("Costo Industriale = ritiri Industriali + noli dei carichi Eurosarda", () => {
+    const s = computeMonthlyStats(baseInput());
+    close(s.costs.industriale, 400 + 200);
+  });
+
+  test("raccolta = Rama + Omar + Industriale ritiri, trazioni e noli separati", () => {
     const s = computeMonthlyStats(baseInput());
     close(s.costs.raccolta, s.costs.rama + s.costs.omar + s.costs.industrialeRitiri);
     close(s.costs.raccolta, 950);
-    close(s.costs.total, s.costs.raccolta + s.costs.nonClassificato + s.costs.trazioni + s.costs.noli);
+    close(
+      s.costs.total,
+      s.costs.raccolta + s.costs.nonClassificato + s.costs.trazioniIndustriali + s.costs.noliEsterni,
+    );
+  });
+
+  test("totale senza doppi conteggi: Rama + Omar + Industriale + noli esterni + non classificato", () => {
+    const s = computeMonthlyStats(baseInput());
+    close(s.costs.total, s.costs.rama + s.costs.omar + s.costs.industriale + s.costs.noliEsterni + s.costs.nonClassificato);
+    close(s.costs.total, 400 + 150 + 400 + 200 + 500);
   });
 
   test("giro senza autista o con azienda diversa: non classificato, fuori dalla raccolta", () => {
@@ -224,6 +242,60 @@ describe("5. Costi separati", () => {
     close(s.costs.nonClassificato, 300);
     close(s.costs.raccolta, 950);
     close(s.costs.total, 950 + 300 + 200 + 500);
+  });
+});
+
+describe("5b. Carichi: trazione industriale o nolo esterno", () => {
+  const giro = (company: "EUROSARDA" | "RAMA" | "OMAR" | "ALTRO") => ({
+    status: "CONFIRMED" as const,
+    shift: "FULL_DAY" as const,
+    km: null,
+    vehicle: { dailyCost: 400, costPerKm: null },
+    driver: { company },
+  });
+
+  test("carico di un autista Eurosarda → Costo Industriale", () => {
+    const c = computeCostBreakdown({
+      routes: [giro("EUROSARDA")],
+      carichi: [{ nolo: 1490, driver: { company: "EUROSARDA" }, trazionista: null }],
+    });
+    close(c.trazioniIndustriali, 1490);
+    close(c.industriale, 400 + 1490);
+    close(c.noliEsterni, 0);
+  });
+
+  test("vettore marcato Eurosarda in anagrafica → industriale anche senza autista", () => {
+    const c = computeCostBreakdown({
+      routes: [],
+      carichi: [{ nolo: 1490, driver: null, trazionista: { isEurosarda: true } }],
+    });
+    close(c.industriale, 1490);
+  });
+
+  test("carico di altro vettore (o autista non Eurosarda) → nolo esterno, mai nelle aziende di raccolta", () => {
+    const c = computeCostBreakdown({
+      routes: [giro("RAMA")],
+      carichi: [
+        { nolo: 2050, driver: null, trazionista: { isEurosarda: false } },
+        { nolo: 950, driver: { company: "RAMA" }, trazionista: null },
+      ],
+    });
+    close(c.noliEsterni, 3000);
+    close(c.rama, 400);
+    close(c.industriale, 0);
+    close(c.total, 400 + 3000);
+  });
+
+  test("le voci mostrate sommano esattamente il totale", () => {
+    const c = computeCostBreakdown({
+      routes: [giro("EUROSARDA"), giro("RAMA"), giro("OMAR"), giro("ALTRO")],
+      carichi: [
+        { nolo: 1490, driver: { company: "EUROSARDA" }, trazionista: null },
+        { nolo: 2050, driver: null, trazionista: null },
+      ],
+    });
+    const somma = costLines(c).reduce((s, l) => s + l.value, 0);
+    close(somma, c.total);
   });
 });
 
@@ -247,10 +319,10 @@ describe("7. Totali", () => {
     close(s.avgVehiclesPerDay, 1);
   });
 
-  test("km autisti: solo giri confermati e trazioni fino a oggi", () => {
+  test("km autisti: solo giri confermati fino a oggi", () => {
     const s = computeMonthlyStats(baseInput());
     const e = s.kmRows.find((r) => r.id === "E")!;
-    close(e.km, 100 + 150);
+    close(e.km, 100);
     const r = s.kmRows.find((r) => r.id === "R")!;
     close(r.km, 0);
   });
@@ -259,7 +331,7 @@ describe("7. Totali", () => {
     const input = baseInput();
     input.drivers = input.drivers.map((x) => (x.id === "E" ? { ...x, active: false } : x));
     const s = computeMonthlyStats(input);
-    assert.ok(s.kmRows.some((r) => r.id === "E" && r.km === 250));
+    assert.ok(s.kmRows.some((r) => r.id === "E" && r.km === 100));
   });
 
   test("prese non assegnate: fino a oggi, non annullate, senza giro confermato", () => {
@@ -275,7 +347,6 @@ describe("7. Totali", () => {
       .map((day) =>
         computeCostBreakdown({
           routes: input.routes.filter((r) => r.routeDate.getTime() === d(day).getTime()),
-          tractions: input.tractions.filter((t) => t.tractionDate.getTime() === d(day).getTime()),
           carichi: input.carichi.filter((c) => c.loadDate.getTime() === d(day).getTime()),
         }).total,
       )

@@ -1,6 +1,7 @@
 "use server";
 
 // Anagrafica trazionisti: nome/vettore e nolo (costo di trazione) predefinito.
+// Il flag "Vettore Eurosarda" rende i suoi carichi trazioni industriali.
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -25,6 +26,7 @@ export async function upsertTrazionista(formData: FormData): Promise<void> {
     defaultCost: num(formData, "defaultCost"),
     notes: ((formData.get("notes") as string) || "").trim() || null,
     active: formData.get("active") !== null,
+    isEurosarda: formData.get("isEurosarda") !== null,
   };
 
   if (id) {
@@ -36,6 +38,10 @@ export async function upsertTrazionista(formData: FormData): Promise<void> {
 
   revalidatePath("/trazionisti");
   revalidatePath("/carichi");
+  // Il flag Eurosarda sposta noli tra Costo Industriale e noli esterni.
+  revalidatePath("/dashboard");
+  revalidatePath("/report-mensile");
+  revalidatePath("/pianificazione");
   redirect("/trazionisti");
 }
 

@@ -5,13 +5,7 @@ import type { Pickup, Customer, Address } from "@prisma/client";
 import { upsertPickup } from "./actions";
 import { FormSection, Field, CheckboxField } from "@/components/forms/FormSection";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
-import {
-  pickupSourceLabels,
-  pickupStatusLabels,
-  priorityLabels,
-  pickupShiftOptions,
-  toOptions,
-} from "@/lib/labels";
+import { priorityLabels, pickupShiftOptions, toOptions } from "@/lib/labels";
 import { toDateInputValue } from "@/lib/dates";
 import type { ActionResult } from "@/lib/validations";
 
@@ -58,13 +52,6 @@ export function PickupForm({
             required
             className="field-input"
           />
-        </Field>
-        <Field label="Origine *" htmlFor="sourceType" error={errors?.sourceType}>
-          <select id="sourceType" name="sourceType" defaultValue={pickup?.sourceType ?? "SPOT"} className="field-input">
-            {toOptions(pickupSourceLabels).map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
         </Field>
         <Field label="Cliente *" htmlFor="customerId" error={errors?.customerId} full>
           {!pickup ? (
@@ -139,13 +126,6 @@ export function PickupForm({
               ))}
             </select>
           )}
-        </Field>
-        <Field label="Stato *" htmlFor="status" error={errors?.status}>
-          <select id="status" name="status" defaultValue={pickup?.status ?? "READY"} className="field-input">
-            {toOptions(pickupStatusLabels).map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
         </Field>
         <Field label="Priorità *" htmlFor="priority" error={errors?.priority}>
           <select id="priority" name="priority" defaultValue={pickup?.priority ?? "NORMAL"} className="field-input">

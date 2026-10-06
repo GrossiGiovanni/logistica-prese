@@ -9,7 +9,6 @@ import { getOpDate } from "@/lib/persisted-filters";
 import { requireBranchId } from "@/lib/branch";
 import {
   getRouteWarnings,
-  findResourceOverlaps,
   routeTotalPallets,
   routeOccupiedMeters,
   pickupPalletEquivalent,
@@ -19,13 +18,8 @@ import {
   routeWarningLabels,
 } from "@/lib/warnings";
 import { WAREHOUSE_COORDS, fetchRoutePolyline } from "@/lib/distance";
-import {
-  timeWindowLabels,
-  priorityLabels,
-  pickupStatusLabels,
-  routeShiftLabels,
-  routeLabel,
-} from "@/lib/labels";
+import { timeWindowLabels, priorityLabels, routeShiftLabels, routeLabel } from "@/lib/labels";
+import { pickupOperationalStatus, pickupOperationalStatusLabels } from "@/lib/pickup-status";
 import { formatDateIt, tomorrowInputValue, parseDateOnly, toDateInputValue, safeDateInput } from "@/lib/dates";
 
 // Palette colori dei giri (ciclica)
@@ -44,13 +38,13 @@ type PickupSource = {
   timeWindow: keyof typeof timeWindowLabels;
   priority: keyof typeof priorityLabels;
   requiresMotrice: boolean;
-  status: keyof typeof pickupStatusLabels;
+  cancelledAt: Date | null;
   rawNotes: string | null;
   customer: { name: string };
   address: { street: string; city: string; province: string; lat: number | null; lng: number | null };
 };
 
-function toPlusPickup(p: PickupSource, selectedDate: string): PlusPickup {
+function toPlusPickup(p: PickupSource, selectedDate: string, inRoute: boolean): PlusPickup {
   return {
     id: p.id,
     numero: p.pickupNumber,
@@ -65,7 +59,7 @@ function toPlusPickup(p: PickupSource, selectedDate: string): PlusPickup {
     priority: p.priority,
     priorityLabel: priorityLabels[p.priority],
     requiresMotrice: p.requiresMotrice,
-    statusLabel: pickupStatusLabels[p.status],
+    statusLabel: pickupOperationalStatusLabels[pickupOperationalStatus({ ...p, routeStopsCount: inRoute ? 1 : 0 })],
     notes: p.rawNotes,
     isBacklog: toDateInputValue(p.pickupDate) !== selectedDate,
     dateLabel: formatDateIt(p.pickupDate),
@@ -88,8 +82,6 @@ export default async function PianificazionePlusPage({
     listRoutes(branchId, selectedDate),
   ]);
 
-  const overlapIds = findResourceOverlaps(routesRaw.filter((r) => r.stops.length > 0));
-
   // Percorsi (polyline) dei giri con fermate, in parallelo.
   const polylines = await Promise.all(
     routesRaw.map((r) => {
@@ -101,8 +93,7 @@ export default async function PianificazionePlusPage({
   );
 
   const routes: PlusRoute[] = routesRaw.map((r, i) => {
-    const warnings = getRouteWarnings(r).map((w) => routeWarningLabels[w]);
-    if (overlapIds.has(r.id)) warnings.push(routeWarningLabels.resource_overlap);
+    const warnings = getRouteWarnings(r, routesRaw).map((w) => routeWarningLabels[w]);
     return {
       id: r.id,
       label: routeLabel(r),
@@ -123,12 +114,12 @@ export default async function PianificazionePlusPage({
             !pickupFitsShift(s.pickup!.timeWindow, r.shift) ? "Fascia diversa dal giro" : null,
             !hasLoadData(s.pickup!) ? "Carico mancante" : null,
           ].filter((w): w is string => w != null),
-          pickup: toPlusPickup(s.pickup!, selectedDate),
+          pickup: toPlusPickup(s.pickup!, selectedDate, true),
         })),
     };
   });
 
-  const unassigned: PlusPickup[] = unassignedRaw.map((p) => toPlusPickup(p, selectedDate));
+  const unassigned: PlusPickup[] = unassignedRaw.map((p) => toPlusPickup(p, selectedDate, false));
 
   return (
     <div>

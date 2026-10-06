@@ -48,6 +48,11 @@ const romeDateFormatter = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
 });
 
+/** Giorno di calendario italiano ("YYYY-MM-DD") di un istante. */
+export function romeDateInputValue(instant: Date = new Date()): string {
+  return romeDateFormatter.format(instant); // en-CA => YYYY-MM-DD
+}
+
 /** Data di oggi a Roma come stringa "YYYY-MM-DD". */
 export function todayInputValue(now: Date = new Date()): string {
   return romeDateFormatter.format(now); // en-CA => YYYY-MM-DD
@@ -89,8 +94,12 @@ export function formatDateIt(date: Date): string {
   return `${wd} ${day}/${month}/${year}`;
 }
 
-/** True se la stringa è una data esistente nel formato "YYYY-MM-DD" (no 31/02). */
-export function isValidDateInput(value: string | null | undefined): boolean {
+/**
+ * True se la stringa è una data di calendario REALE nel formato "YYYY-MM-DD".
+ * Il confronto di andata e ritorno scarta le date impossibili (es. 2026-02-30),
+ * che Date accetterebbe facendole "scivolare" al mese successivo.
+ */
+export function isValidDateInput(value: unknown): value is string {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const d = parseDateOnly(value);
   return !Number.isNaN(d.getTime()) && toDateInputValue(d) === value;
@@ -111,4 +120,21 @@ export function isValidMonthInput(value: string | null | undefined): boolean {
 /** Normalizza un input "YYYY-MM": se non valido, mese corrente (a Roma). */
 export function normalizeMonth(month?: string | null, now: Date = new Date()): string {
   return isValidMonthInput(month) ? (month as string) : todayInputValue(now).slice(0, 7);
+}
+
+type ParamValue = string | string[] | undefined | null;
+
+/**
+ * Parametro data di una pagina reso sicuro: se manca o non è una data reale si
+ * usa il valore di riserva, così un URL sbagliato non manda in errore la pagina.
+ */
+export function safeDateParam(value: ParamValue, fallback: string): string {
+  const v = Array.isArray(value) ? value[0] : value;
+  return isValidDateInput(v) ? v : fallback;
+}
+
+/** Come safeDateParam, per i mesi "YYYY-MM" (01-12). */
+export function safeMonthParam(value: ParamValue, fallback: string): string {
+  const v = Array.isArray(value) ? value[0] : value;
+  return isValidMonthInput(v) ? (v as string) : fallback;
 }

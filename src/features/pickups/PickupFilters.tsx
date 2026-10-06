@@ -1,9 +1,5 @@
-import {
-  pickupStatusLabels,
-  pickupSourceLabels,
-  timeWindowLabels,
-  toOptions,
-} from "@/lib/labels";
+import { pickupSourceLabels, timeWindowLabels, toOptions } from "@/lib/labels";
+import { pickupStatusFilterOptions } from "@/lib/pickup-status";
 import { applyPreseFilters, clearPreseFilters } from "./filter-actions";
 
 /** Barra filtri prese — i filtri vengono salvati in un cookie e persistono tra le pagine. */
@@ -29,11 +25,9 @@ export function PickupFiltersBar({
         <label className="field-label">Stato</label>
         <select name="status" defaultValue={current.status ?? ""} className="field-input w-auto">
           <option value="">Tutti</option>
-          {toOptions(pickupStatusLabels)
-            .filter((o) => o.value !== "CANCELLED")
-            .map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
+          {pickupStatusFilterOptions.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
         </select>
       </div>
       <div className="pb-2">

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { routeInclude } from "@/features/routes/queries";
 import { normalizeMonth, todayInputValue } from "@/lib/dates";
 import { computeMonthlyStats, type MonthlyStats } from "./monthly-calc";
+import { caricoCostSelect } from "./daily";
 
 export { KM_LIMIT_PER_DAY, DEFAULT_KM_LIMIT, workdaysBetween } from "./monthly-calc";
 export type { KmRow, MonthlyStats } from "./monthly-calc";
@@ -24,7 +25,7 @@ export async function getMonthlyStats(branchId: string, month?: string): Promise
   const monthEnd = new Date(Date.UTC(year, mon, 0));
   const range = { gte: monthStart, lte: monthEnd };
 
-  const [routes, monthPickups, drivers, tractions, carichi] = await Promise.all([
+  const [routes, monthPickups, drivers, carichi] = await Promise.all([
     // Tutti gli stati e anche i giorni futuri: il calcolo separa consuntivo,
     // bozze e pianificato.
     prisma.route.findMany({ where: { branchId, routeDate: range }, include: routeInclude }),
@@ -33,7 +34,7 @@ export async function getMonthlyStats(branchId: string, month?: string): Promise
       select: {
         id: true,
         pickupDate: true,
-        status: true,
+        cancelledAt: true,
         pallets: true,
         loadingMeters: true,
         taxableVolumeM3: true,
@@ -47,14 +48,8 @@ export async function getMonthlyStats(branchId: string, month?: string): Promise
       select: { id: true, name: true, active: true, defaultVehicle: { select: { vehicleType: true } } },
       orderBy: { name: "asc" },
     }),
-    prisma.traction.findMany({
-      where: { branchId, tractionDate: range },
-      select: { tractionDate: true, cost: true, km: true, driverId: true },
-    }),
-    prisma.carico.findMany({
-      where: { branchId, loadDate: range },
-      select: { loadDate: true, nolo: true },
-    }),
+    // Carichi: unica fonte di trazioni (industriali) e noli esterni.
+    prisma.carico.findMany({ where: { branchId, loadDate: range }, select: caricoCostSelect }),
   ]);
 
   const stats = computeMonthlyStats({
@@ -62,7 +57,6 @@ export async function getMonthlyStats(branchId: string, month?: string): Promise
     today: todayInputValue(),
     routes,
     monthPickups: monthPickups.map(({ routeStops, ...p }) => ({ ...p, inConfirmedRoute: routeStops.length > 0 })),
-    tractions,
     carichi,
     drivers,
   });

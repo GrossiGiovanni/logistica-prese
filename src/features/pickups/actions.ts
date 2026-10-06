@@ -141,8 +141,12 @@ export async function cancelPickup(formData: FormData): Promise<void> {
 
   if (pickup.recurringPickupId) {
     // Da ricorrenza: resta come blocco anti-rigenerazione, ma invisibile.
-    await prisma.routeStop.deleteMany({ where: { pickupId: id } });
-    await prisma.pickup.update({ where: { id }, data: { status: "CANCELLED" } });
+    // cancelledAt è l'unico stato persistito; "status" è scritto solo per
+    // compatibilità durante la transizione (verrà rimosso con il campo).
+    await prisma.$transaction([
+      prisma.routeStop.deleteMany({ where: { pickupId: id } }),
+      prisma.pickup.update({ where: { id }, data: { cancelledAt: new Date(), status: "CANCELLED" } }),
+    ]);
   } else {
     // Spot/import: eliminazione definitiva (cascade rimuove le fermate).
     await prisma.pickup.delete({ where: { id } });

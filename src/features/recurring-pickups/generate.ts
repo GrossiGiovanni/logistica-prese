@@ -58,8 +58,7 @@ export async function generateRecurringPickups(dateStr: string): Promise<Generat
       customerId: r.customerId,
       addressId: r.addressId,
       sourceType: "RECURRING" as const,
-      // Dati minimi presenti -> READY, altrimenti DRAFT.
-      status: r.defaultPallets != null ? ("READY" as const) : ("DRAFT" as const),
+      // Nessuno stato: è calcolato (giro / dati di carico / annullata).
       timeWindow: r.defaultTimeWindow,
       timeFrom: r.defaultTimeFrom,
       timeTo: r.defaultTimeTo,

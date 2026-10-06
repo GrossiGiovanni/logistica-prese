@@ -1,6 +1,8 @@
-import type { Prisma, PickupStatus, PickupSourceType, TimeWindow } from "@prisma/client";
+import type { Prisma, PickupSourceType, TimeWindow } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { parseDateOnly } from "@/lib/dates";
+import type { PickupOperationalStatus } from "@/lib/pickup-status";
+import { andWhere, pickupStatusWhere, unassignedPickupsWhere } from "@/lib/pickup-where";
 
 export const pickupInclude = {
   customer: { select: { id: true, name: true } },
@@ -28,7 +30,8 @@ export type PickupWithRelations = Prisma.PickupGetPayload<{ include: typeof pick
 
 export type PickupFilters = {
   date?: string;
-  status?: PickupStatus;
+  /** Stato CALCOLATO (Pianificata / Pronta / Da completare). */
+  status?: PickupOperationalStatus;
   sourceType?: PickupSourceType;
   timeWindow?: TimeWindow;
   search?: string;
@@ -38,10 +41,11 @@ export type PickupFilters = {
 export function listPickups(branchId: string, filters: PickupFilters = {}) {
   // Le prese annullate non compaiono mai (vengono comunque eliminate; restano
   // solo quelle da ricorrenza come blocco anti-rigenerazione, invisibili).
-  const where: Prisma.PickupWhereInput = { branchId, status: { not: "CANCELLED" } };
+  let where: Prisma.PickupWhereInput = { branchId, cancelledAt: null };
 
   if (filters.date) where.pickupDate = parseDateOnly(filters.date);
-  if (filters.status && filters.status !== "CANCELLED") where.status = filters.status;
+  // Stato calcolato: stessa regola del badge, tradotta in filtro.
+  if (filters.status && filters.status !== "ANNULLATA") where = andWhere(where, pickupStatusWhere(filters.status));
   if (filters.unassignedOnly) where.routeStops = { none: {} };
   if (filters.sourceType) where.sourceType = filters.sourceType;
   if (filters.timeWindow) where.timeWindow = filters.timeWindow;
@@ -82,7 +86,7 @@ export async function listPickupsForMap(branchId: string, date: string): Promise
     where: {
       branchId,
       pickupDate: parseDateOnly(date),
-      status: { not: "CANCELLED" },
+      cancelledAt: null,
       address: { lat: { not: null }, lng: { not: null } },
     },
     select: {
@@ -116,17 +120,12 @@ export type UnassignedFilters = {
 };
 
 /**
- * Prese assegnabili per una certa data: READY o DRAFT, non annullate, non già
- * pianificate. Include anche le prese **dei giorni precedenti** rimaste non
- * assegnate (pickupDate <= data selezionata), così da poterle recuperare.
+ * Prese da assegnare per una certa data: non annullate e non in un giro, inclusi
+ * i recuperi dei giorni precedenti. È la STESSA regola del KPI "Non assegnate"
+ * (unassignedPickupsWhere), così lista e KPI coincidono sempre.
  */
 export function listUnassignedPickups(branchId: string, date: string, filters: UnassignedFilters = {}) {
-  const where: Prisma.PickupWhereInput = {
-    branchId,
-    pickupDate: { lte: parseDateOnly(date) },
-    status: { in: ["READY", "DRAFT"] },
-    routeStops: { none: {} },
-  };
+  const where: Prisma.PickupWhereInput = unassignedPickupsWhere(branchId, date);
   if (filters.timeWindow) where.timeWindow = filters.timeWindow;
   if (filters.priority) where.priority = filters.priority;
   if (filters.search) {

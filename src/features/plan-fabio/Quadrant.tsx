@@ -42,7 +42,7 @@ export function Quadrant({
   data: QuadrantData;
   branches: { id: string; name: string; code: string }[];
 }) {
-  const { pickups, routes, kpi, overlapIds, options } = data;
+  const { pickups, routes, kpi, dayRoutes, options } = data;
 
   return (
     <section className="flex h-[80vh] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -141,8 +141,7 @@ export function Quadrant({
               </div>
             ) : (
               routes.map((r) => {
-                const warnings = getRouteWarnings(r);
-                if (overlapIds.has(r.id)) warnings.push("resource_overlap");
+                const warnings = getRouteWarnings(r, dayRoutes);
                 const total = routeTotalPallets(r);
                 const capExceeded = r.vehicle?.capacityPallets != null && total > r.vehicle.capacityPallets;
                 const cost = routeTotalCost(r);

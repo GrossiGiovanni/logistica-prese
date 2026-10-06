@@ -5,7 +5,8 @@
 // quadranti: così modificare un quadrante non influenza gli altri.
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { routeShiftLabels, pickupStatusLabels } from "@/lib/labels";
+import { routeShiftLabels } from "@/lib/labels";
+import { pickupOperationalStatusLabels } from "@/lib/pickup-status";
 
 type Option = { id: string; name?: string; label?: string };
 
@@ -117,8 +118,8 @@ export function QuadrantFilters({
         <span className="text-[10px] font-medium uppercase text-slate-400">Stato presa</span>
         <select value={current.status} onChange={(e) => update("status", e.target.value)} className={sel}>
           <option value="">Tutti</option>
-          {(["READY", "DRAFT", "PLANNED"] as const).map((s) => (
-            <option key={s} value={s}>{pickupStatusLabels[s]}</option>
+          {(["PRONTA", "DA_COMPLETARE", "PIANIFICATA"] as const).map((s) => (
+            <option key={s} value={s}>{pickupOperationalStatusLabels[s]}</option>
           ))}
         </select>
       </label>

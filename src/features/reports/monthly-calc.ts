@@ -10,11 +10,16 @@
 // - Forecast = registrato + per ogni giorno lavorativo rimanente: il dato già
 //   pianificato se il giorno ne ha, altrimenti la media per giorno lavorativo
 //   trascorso. Un giorno è o pianificato o proiettato, mai entrambi.
+// - Trazioni = SOLO i Carichi: carichi fatti da Eurosarda = trazioni
+//   industriali (nel Costo Industriale), gli altri = noli esterni.
+// - Presa annullata = cancelledAt valorizzato (unico stato persistito).
 
-import type { PickupStatus, RouteShift, RouteStatus } from "@prisma/client";
+import type { RouteShift, RouteStatus } from "@prisma/client";
 import {
   computeCostBreakdown,
   draftRoutesCost,
+  isIndustrialCarico,
+  type CaricoCostInput,
   type CostBreakdown,
   type DriverCompanyKey,
 } from "@/lib/costs";
@@ -30,7 +35,7 @@ export const DEFAULT_KM_LIMIT = 300;
 type CalcPickup = {
   id: string;
   pickupDate: Date;
-  status: PickupStatus;
+  cancelledAt: Date | null;
   pallets: number | null;
   loadingMeters: number | null;
   taxableVolumeM3: number | null;
@@ -56,8 +61,8 @@ export type MonthlyInput = {
   }[];
   /** Prese con data presa nel mese (per le non assegnate). */
   monthPickups: (CalcPickup & { inConfirmedRoute: boolean })[];
-  tractions: { tractionDate: Date; cost: number | null; km: number | null; driverId: string | null }[];
-  carichi: { loadDate: Date; nolo: number | null }[];
+  /** Carichi del mese: unica fonte di trazioni (industriali) e noli esterni. */
+  carichi: (CaricoCostInput & { loadDate: Date })[];
   /** Autisti della filiale (anche disattivati: compaiono se hanno km nel mese). */
   drivers: { id: string; name: string; active: boolean; defaultVehicle: { vehicleType: string } | null }[];
 };
@@ -99,7 +104,7 @@ export type MonthlyStats = {
   plannedWorkdays: number;
   projectedPickups: number;
   projectedVolume: number;
-  projectedCosts: Pick<CostBreakdown, "raccolta" | "nonClassificato" | "trazioni" | "noli" | "total">;
+  projectedCosts: Pick<CostBreakdown, "raccolta" | "nonClassificato" | "trazioniIndustriali" | "noliEsterni" | "total">;
   // --- classifiche ---
   topCustomer: { name: string; count: number; volume: number } | null;
   topDriver: { name: string; pickups: number; routes: number } | null;
@@ -159,8 +164,6 @@ export function computeMonthlyStats(input: MonthlyInput): MonthlyStats {
   const pastRoutes = confirmed.filter((r) => isPast(r.routeDate));
   const futureRoutes = confirmed.filter((r) => !isPast(r.routeDate));
   const drafts = monthRoutes.filter((r) => r.status === "DRAFT");
-  const monthTractions = input.tractions.filter((t) => inMonth(t.tractionDate));
-  const pastTractions = monthTractions.filter((t) => isPast(t.tractionDate));
   const monthCarichi = input.carichi.filter((c) => inMonth(c.loadDate));
   const pastCarichi = monthCarichi.filter((c) => isPast(c.loadDate));
 
@@ -168,7 +171,7 @@ export function computeMonthlyStats(input: MonthlyInput): MonthlyStats {
   const executed = new Map<string, CalcPickup>();
   for (const r of [...pastRoutes].sort((a, b) => a.routeDate.getTime() - b.routeDate.getTime())) {
     for (const s of r.stops) {
-      if (!s.pickup || s.pickup.status === "CANCELLED" || executed.has(s.pickup.id)) continue;
+      if (!s.pickup || s.pickup.cancelledAt != null || executed.has(s.pickup.id)) continue;
       executed.set(s.pickup.id, s.pickup);
     }
   }
@@ -178,7 +181,7 @@ export function computeMonthlyStats(input: MonthlyInput): MonthlyStats {
   const pallets = executedList.reduce((s, p) => s + pickupPalletEquivalent(p), 0);
 
   // --- Costi a consuntivo ---
-  const costs = computeCostBreakdown({ routes: pastRoutes, tractions: pastTractions, carichi: pastCarichi });
+  const costs = computeCostBreakdown({ routes: pastRoutes, carichi: pastCarichi });
 
   // --- Mezzi e giorni con operatività (fino a oggi) ---
   const vehiclesByDay = new Map<string, Set<string>>();
@@ -193,7 +196,6 @@ export function computeMonthlyStats(input: MonthlyInput): MonthlyStats {
       allVehicles.add(r.vehicleId);
     }
   }
-  for (const t of pastTractions) operativeDaySet.add(toDateInputValue(t.tractionDate));
   for (const c of pastCarichi) operativeDaySet.add(toDateInputValue(c.loadDate));
   const operativeDays = operativeDaySet.size;
   const avg = (total: number, n: number) => (n > 0 ? total / n : 0);
@@ -201,7 +203,7 @@ export function computeMonthlyStats(input: MonthlyInput): MonthlyStats {
 
   // --- Prese non assegnate: data presa fino a oggi, non annullate, senza giro confermato ---
   const unassignedPickups = input.monthPickups.filter(
-    (p) => inMonth(p.pickupDate) && isPast(p.pickupDate) && p.status !== "CANCELLED" && !p.inConfirmedRoute,
+    (p) => inMonth(p.pickupDate) && isPast(p.pickupDate) && p.cancelledAt == null && !p.inConfirmedRoute,
   ).length;
 
   // --- Forecast ---
@@ -212,19 +214,19 @@ export function computeMonthlyStats(input: MonthlyInput): MonthlyStats {
   const remainingDays = workdayKeys(remainingStart, monthEnd);
 
   // Pianificato per giorno (solo date future): prese/volumi/raccolta dai giri
-  // confermati, trazioni e noli dai rispettivi registri.
+  // confermati, trazioni industriali e noli esterni dai Carichi.
   const plannedPickups = new Map<string, number>();
   const plannedRaccolta = new Map<string, number>();
   const plannedNonClass = new Map<string, number>();
   const plannedSeen = new Set(executed.keys());
   for (const r of futureRoutes) {
     const day = toDateInputValue(r.routeDate);
-    const c = computeCostBreakdown({ routes: [r], tractions: [], carichi: [] });
+    const c = computeCostBreakdown({ routes: [r], carichi: [] });
     addTo(plannedRaccolta, day, c.raccolta);
     addTo(plannedNonClass, day, c.nonClassificato);
     addTo(plannedPickups, day, 0);
     for (const s of r.stops) {
-      if (!s.pickup || s.pickup.status === "CANCELLED" || plannedSeen.has(s.pickup.id)) continue;
+      if (!s.pickup || s.pickup.cancelledAt != null || plannedSeen.has(s.pickup.id)) continue;
       plannedSeen.add(s.pickup.id);
       addTo(plannedPickups, day, 1);
     }
@@ -234,12 +236,10 @@ export function computeMonthlyStats(input: MonthlyInput): MonthlyStats {
   const volumePerPickup = avg(volumeM3, pickupsCount);
   const plannedVolume = new Map([...plannedPickups].map(([day, n]) => [day, n * volumePerPickup]));
   const plannedTrazioni = new Map<string, number>();
-  for (const t of monthTractions) {
-    if (!isPast(t.tractionDate)) addTo(plannedTrazioni, toDateInputValue(t.tractionDate), t.cost ?? 0);
-  }
   const plannedNoli = new Map<string, number>();
   for (const c of monthCarichi) {
-    if (!isPast(c.loadDate)) addTo(plannedNoli, toDateInputValue(c.loadDate), c.nolo ?? 0);
+    if (isPast(c.loadDate)) continue;
+    addTo(isIndustrialCarico(c) ? plannedTrazioni : plannedNoli, toDateInputValue(c.loadDate), c.nolo ?? 0);
   }
 
   const proj = (registered: number, planned: Map<string, number>) =>
@@ -247,12 +247,15 @@ export function computeMonthlyStats(input: MonthlyInput): MonthlyStats {
   const projectedCosts = {
     raccolta: proj(costs.raccolta, plannedRaccolta),
     nonClassificato: proj(costs.nonClassificato, plannedNonClass),
-    trazioni: proj(costs.trazioni, plannedTrazioni),
-    noli: proj(costs.noli, plannedNoli),
+    trazioniIndustriali: proj(costs.trazioniIndustriali, plannedTrazioni),
+    noliEsterni: proj(costs.noliEsterni, plannedNoli),
     total: 0,
   };
   projectedCosts.total =
-    projectedCosts.raccolta + projectedCosts.nonClassificato + projectedCosts.trazioni + projectedCosts.noli;
+    projectedCosts.raccolta +
+    projectedCosts.nonClassificato +
+    projectedCosts.trazioniIndustriali +
+    projectedCosts.noliEsterni;
 
   // --- Top cliente (prese eseguite, spareggio sul volume) ---
   const byCustomer = new Map<string, { name: string; count: number; volume: number }>();
@@ -277,10 +280,9 @@ export function computeMonthlyStats(input: MonthlyInput): MonthlyStats {
   const topDriver =
     [...byDriver.values()].sort((a, b) => b.pickups - a.pickups || b.routes - a.routes)[0] ?? null;
 
-  // --- Km autisti (giri confermati + trazioni, fino a oggi) ---
+  // --- Km autisti (giri confermati, fino a oggi; i carichi non hanno km) ---
   const kmByDriver = new Map<string, number>();
   for (const r of pastRoutes) if (r.driverId && r.km != null) addTo(kmByDriver, r.driverId, r.km);
-  for (const t of pastTractions) if (t.driverId && t.km != null) addTo(kmByDriver, t.driverId, t.km);
   const kmRows: KmRow[] = input.drivers
     .filter((d) => d.active || (kmByDriver.get(d.id) ?? 0) > 0)
     .map((d) => {

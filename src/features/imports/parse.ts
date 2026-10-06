@@ -30,17 +30,6 @@ export function normalizePickupNumber(v: string | null | undefined): string {
   return (v ?? "").replace(/\s+/g, " ").trim().toUpperCase();
 }
 
-/**
- * Chiave canonica del numero presa per il match tra estrazioni diverse:
- * AS400 a volte esporta "2026 13 9005032" e a volte solo "9005032" — il vero
- * identificativo è l'ultimo segmento numerico.
- */
-export function pickupNumberKey(v: string | null | undefined): string {
-  const norm = normalizePickupNumber(v);
-  const parts = norm.split(" ");
-  return parts[parts.length - 1] || norm;
-}
-
 function cellText(value: ExcelJS.CellValue): string | null {
   if (value == null) return null;
   if (value instanceof Date) return value.toISOString();
@@ -52,6 +41,33 @@ function cellText(value: ExcelJS.CellValue): string | null {
   }
   const s = String(value).replace(/\s+/g, " ").trim();
   return s || null;
+}
+
+/**
+ * Interpreta un PESO scritto all'italiana:
+ *  - "1.580,5" → 1580,5   (punto = migliaia, virgola = decimali)
+ *  - "1.580"   → 1580     (gruppi di 3 cifre dopo il punto = migliaia)
+ *  - "2,5"     → 2,5      (virgola decimale)
+ *  - "1.5"     → 1,5      (un punto non seguito da 3 cifre resta decimale)
+ * Solo per i pesi: un volume "1.580" m³ non è plausibile come peso lo è.
+ */
+export function parseItalianWeight(raw: string | null | undefined): number | null {
+  const s = (raw ?? "").replace(/\s+/g, "");
+  if (!s) return null;
+  let normalized: string;
+  if (s.includes(",") && s.includes(".")) normalized = s.replace(/\./g, "").replace(",", ".");
+  else if (s.includes(",")) normalized = s.replace(",", ".");
+  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) normalized = s.replace(/\./g, "");
+  else normalized = s;
+  const n = Number(normalized);
+  return Number.isNaN(n) ? null : n;
+}
+
+/** Peso da una cella: i numeri veri restano tali, i testi seguono il formato italiano. */
+function cellWeight(value: ExcelJS.CellValue): number | null {
+  if (value == null || value === "") return null;
+  if (typeof value === "number") return value;
+  return parseItalianWeight(cellText(value));
 }
 
 function cellNumber(value: ExcelJS.CellValue): number | null {
@@ -91,8 +107,10 @@ function parseQuantities(text: string | null) {
   if (mtl) out.loadingMeters = parseFloat(mtl[1].replace(",", "."));
   const mc = up.match(/(\d+(?:[.,]\d+)?)\s*MC\b/);
   if (mc) out.volumeM3 = parseFloat(mc[1].replace(",", "."));
-  const kg = up.match(/(\d+(?:[.,]\d+)?)\s*KG/);
-  if (kg) out.weightKg = parseFloat(kg[1].replace(",", "."));
+  // Il gruppo cattura anche i separatori multipli ("1.580,5") e lo interpreta
+  // all'italiana: "1.700 KG" sono 1700 kg, non 1,7.
+  const kg = up.match(/(\d+(?:[.,]\d+)*)\s*KG/);
+  if (kg) out.weightKg = parseItalianWeight(kg[1]);
   return out;
 }
 
@@ -120,8 +138,9 @@ function parseLoadText(pltText: string | null, noteText: string | null) {
   };
   if (!joined) return out;
 
-  // "ORE 16,00" / "ORE 8" / "ORE 15.30"
-  const ore = joined.match(/ORE\s*(\d{1,2})(?:[.,:](\d{1,2}))?/);
+  // "ORE 16,00" / "ORE 8" / "ORE 15.30" — ORE solo come parola intera:
+  // senza \b anche "MOTORE 15" o "DOTTORE 10" produrrebbero un orario inventato.
+  const ore = joined.match(/\bORE\s*(\d{1,2})(?:[.,:](\d{1,2}))?/);
   if (ore) {
     const hh = parseInt(ore[1], 10);
     let mm = ore[2] ? parseInt(ore[2], 10) : 0;
@@ -139,9 +158,13 @@ function parseLoadText(pltText: string | null, noteText: string | null) {
   return out;
 }
 
-/** Trova l'indice colonna per nome intestazione (tollerante). */
+/**
+ * Trova l'indice colonna per nome intestazione (tollerante a spazi, punteggiatura
+ * e accenti). Le CIFRE vengono conservate: senza, "note1" e "note" diventerebbero
+ * entrambe "NOTE" e leggerebbero la stessa colonna.
+ */
 function headerIndex(headers: (string | null)[], ...names: string[]): number {
-  const norm = (s: string) => s.toUpperCase().replace(/[^A-Z]/g, "");
+  const norm = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
   const targets = names.map(norm);
   return headers.findIndex((h) => h != null && targets.includes(norm(h)));
 }
@@ -216,7 +239,7 @@ export async function parseAs400Workbook(buffer: ArrayBuffer): Promise<ParseResu
       pallets: parsed.pallets,
       loadingMeters: parsed.loadingMeters,
       volumeM3: parsed.volumeM3 ?? cellNumber(get(iMcu)),
-      weightKg: parsed.weightKg ?? cellNumber(get(iPeso)),
+      weightKg: parsed.weightKg ?? cellWeight(get(iPeso)),
       colli: cellNumber(get(iColli)) != null ? Math.round(cellNumber(get(iColli))!) : null,
       timeWindow: parsed.timeWindow,
       timeFrom: parsed.timeFrom,

@@ -25,7 +25,9 @@ il soft-delete. `capacityPallets` usato per il warning di capacità superata.
 
 ### Pickup (presa)
 La presa/ritiro di un giorno. Appartiene a `Customer` e `Address`. `sourceType` =
-SPOT | RECURRING. `status` = DRAFT | READY | PLANNED | CANCELLED. Può essere
+SPOT | RECURRING. Lo stato operativo è CALCOLATO (vedi sotto); l'unico stato
+salvato è l'annullamento (`cancelledAt`). Il vecchio campo `status` è deprecato:
+non viene più letto né scritto e sarà rimosso con una migrazione dedicata. Può essere
 collegata opzionalmente a una `RecurringPickup` (campo `recurringPickupId`) per
 tracciare la generazione automatica ed evitare duplicati.
 
@@ -42,8 +44,21 @@ Giro di una data. `shift` = MORNING | AFTERNOON | FULL_DAY. `status` = DRAFT |
 CONFIRMED. Opzionalmente collegato a `Driver` e `Vehicle`. Ha molti `RouteStop`.
 
 ### RouteStop (fermata)
-Collega una `Route` a una `Pickup` con un `sequence` (ordine manuale).
-Vincolo unico `@@unique([routeId, pickupId])`.
+Collega una `Route` a una `Pickup` (o a un `Reso`) con un `sequence` (ordine
+manuale). Vincoli unici `@@unique([pickupId])` e `@@unique([resoId])`: una presa
+(o un reso) sta in UN SOLO giro; assegnarla a un altro giro la sposta.
+
+### Carico (carichi / trazioni)
+Carichi gestiti a mano dal magazzino, con vettore (`trazionistaId`/`carrier`),
+nolo e, se fatto da Eurosarda, l'autista (`driverId`). I Carichi sono l'UNICA
+fonte delle trazioni: un carico con autista di azienda `EUROSARDA` oppure con
+vettore marcato `Trazionista.isEurosarda` è una **trazione industriale** e il
+suo nolo entra nel Costo Industriale; gli altri carichi sono **noli esterni**.
+
+### Traction (DEPRECATA)
+Vecchia sezione "Trazioni", sostituita dai Carichi. Nessun codice la usa e non
+entra in alcun costo; la tabella resta come archivio fino a una migrazione di
+pulizia (DROP) da eseguire con backup verificato.
 
 ## Relazioni (sintesi)
 
@@ -60,12 +75,18 @@ Vincolo unico `@@unique([routeId, pickupId])`.
 `VehicleType`, `CostLevel`, `PickupSourceType`, `PickupStatus`, `TimeWindow`,
 `Priority`, `RouteShift`, `RouteStatus`.
 
-## Logica di stato delle prese
+## Logica di stato delle prese (calcolata)
 
-- Generazione fissa: `READY` se i dati minimi (pallet) sono presenti, altrimenti `DRAFT`.
-- Assegnazione a un giro: la presa passa a `PLANNED`.
-- Rimozione da un giro (se non in altri giri): torna a `READY` o `DRAFT` in base ai dati.
-- Annullamento: `CANCELLED` (soft) e rimozione da eventuali giri.
+Regola unica in [`src/lib/pickup-status.ts`](../src/lib/pickup-status.ts), filtri
+equivalenti in `src/lib/pickup-where.ts`:
+
+- **Annullata**: `cancelledAt` valorizzato (prevale su tutto).
+- **Pianificata**: la presa è in un giro.
+- **Pronta**: non in un giro, con un dato di carico (pallet, metri lineari o m³).
+- **Da completare**: non in un giro e senza dati di carico.
+
+Nessuna azione scrive lo stato: assegnare, spostare o togliere una presa da un
+giro cambia automaticamente lo stato mostrato.
 
 ## Report mensile (consuntivo e forecast)
 
@@ -77,10 +98,15 @@ test in `monthly-calc.test.ts` (`npm test`).
   sono mostrati a parte.
 - **Prese effettuate**: prese distinte nei giri confermati del periodo, anche se
   con data presa precedente (arretrate).
-- **Costo raccolta** = Rama + Omar + Industriale ritiri. Trazioni e noli sono
-  voci separate; giri senza autista o con azienda «Altro» → «non classificato».
+- **Costo raccolta** = Rama + Omar + Industriale ritiri; giri senza autista o con
+  azienda «Altro» → «non classificato».
+- **Costo Industriale** = Industriale ritiri + trazioni Eurosarda (noli dei Carichi
+  fatti da Eurosarda). Gli altri noli sono «noli esterni», voce separata.
+- **Costo totale** = Rama + Omar + Costo Industriale + noli esterni + non
+  classificato (ogni euro contato una sola volta). Stessa ripartizione in Home,
+  report giornaliero (Pianificazione), report mensile ed export «Costi e km».
 - **Forecast**: registrato + per ogni giorno lavorativo rimanente il pianificato
-  (giri confermati, trazioni, noli già registrati) oppure la media per giorno
+  (giri confermati, carichi già registrati) oppure la media per giorno
   lavorativo trascorso: mai entrambi.
 
 ## Dati mancanti

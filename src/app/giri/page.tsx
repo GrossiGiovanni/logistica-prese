@@ -51,7 +51,7 @@ export default async function GiriPage({
         <div className="space-y-3">
           {routes.map((route) => {
             const totalPallets = routeTotalPallets(route);
-            const warnings = getRouteWarnings(route);
+            const warnings = getRouteWarnings(route, routes);
             return (
               <Link
                 key={route.id}

@@ -17,7 +17,10 @@ export type RouteWarning =
   | "contains_unvalidated_pickups"
   | "pickup_shift_mismatch"
   | "vehicle_unavailable"
-  | "resource_overlap";
+  | "motrice_required"
+  | "tail_lift_required"
+  | "driver_busy"
+  | "vehicle_busy";
 
 // ---------------------------------------------------------------------------
 // Compatibilità fasce (mattina / pomeriggio / giornata intera)
@@ -56,7 +59,10 @@ export const routeWarningLabels: Record<RouteWarning, string> = {
   contains_unvalidated_pickups: "Prese con dati mancanti",
   pickup_shift_mismatch: "Presa in fascia diversa dal giro",
   vehicle_unavailable: "Mezzo non disponibile in questa fascia",
-  resource_overlap: "Mezzo/autista già impegnato",
+  motrice_required: "Presa richiede motrice: mezzo non compatibile",
+  tail_lift_required: "Presa richiede sponda: mezzo senza sponda",
+  driver_busy: "Autista già impegnato",
+  vehicle_busy: "Mezzo già impegnato",
 };
 
 // Tono del badge: rosso per criticità bloccanti, giallo per avvisi.
@@ -75,7 +81,10 @@ export const routeWarningTone: Record<RouteWarning, "red" | "amber" | "blue"> = 
   contains_unvalidated_pickups: "amber",
   pickup_shift_mismatch: "red",
   vehicle_unavailable: "red",
-  resource_overlap: "red",
+  motrice_required: "red",
+  tail_lift_required: "red",
+  driver_busy: "red",
+  vehicle_busy: "red",
 };
 
 type PickupLike = Pick<
@@ -212,8 +221,23 @@ export function routeUsesMotrice(route: RouteWithRelations): boolean {
   return route.vehicle?.vehicleType === "MOTRICE";
 }
 
-/** Lista dei warning applicabili a un giro. */
-export function getRouteWarnings(route: RouteWithRelations): RouteWarning[] {
+/** Giro della stessa giornata, per valutare se autista o mezzo sono già impegnati. */
+export type DayRoute = {
+  id: string;
+  shift: RouteShift;
+  driverId: string | null;
+  vehicleId: string | null;
+  stops: unknown[];
+};
+
+/**
+ * Lista COMPLETA dei warning di un giro: unica fonte usata da pianificazione,
+ * lista giri, dettaglio giro e Pianificazione Plus.
+ *
+ * @param dayRoutes tutti i giri della stessa giornata (il giro stesso può essere
+ *   incluso: viene ignorato). Servono per "autista/mezzo già impegnato".
+ */
+export function getRouteWarnings(route: RouteWithRelations, dayRoutes: DayRoute[] = []): RouteWarning[] {
   const warnings: RouteWarning[] = [];
 
   if (!route.vehicle) warnings.push("vehicle_missing");
@@ -244,28 +268,26 @@ export function getRouteWarnings(route: RouteWithRelations): RouteWarning[] {
   const hasUnvalidated = routePickups(route).some((p) => hasMissingData(p));
   if (hasUnvalidated) warnings.push("contains_unvalidated_pickups");
 
-  return warnings;
-}
-
-/**
- * Conflitti di risorse tra i giri di una giornata: stesso mezzo o stesso autista
- * usato in due giri con fasce sovrapposte. Restituisce gli id dei giri in conflitto.
- */
-export function findResourceOverlaps(
-  routes: { id: string; shift: RouteShift; vehicleId: string | null; driverId: string | null }[],
-): Set<string> {
-  const conflicting = new Set<string>();
-  for (let i = 0; i < routes.length; i++) {
-    for (let j = i + 1; j < routes.length; j++) {
-      const a = routes[i];
-      const b = routes[j];
-      const sameVehicle = a.vehicleId && a.vehicleId === b.vehicleId;
-      const sameDriver = a.driverId && a.driverId === b.driverId;
-      if ((sameVehicle || sameDriver) && shiftsOverlap(a.shift, b.shift)) {
-        conflicting.add(a.id);
-        conflicting.add(b.id);
-      }
+  // Requisiti delle prese rispetto al mezzo assegnato.
+  if (route.vehicle) {
+    const pickups = routePickups(route);
+    if (pickups.some((p) => p.requiresMotrice) && route.vehicle.vehicleType !== "MOTRICE") {
+      warnings.push("motrice_required");
+    }
+    if (pickups.some((p) => p.requiresTailLift) && !route.vehicle.hasTailLift) {
+      warnings.push("tail_lift_required");
     }
   }
-  return conflicting;
+
+  // Risorse già impegnate in altri giri della giornata con fascia sovrapposta.
+  // Contano solo i giri effettivamente impegnati (con almeno una fermata).
+  if (route.stops.length > 0) {
+    const others = dayRoutes.filter(
+      (o) => o.id !== route.id && o.stops.length > 0 && shiftsOverlap(o.shift, route.shift),
+    );
+    if (route.driverId && others.some((o) => o.driverId === route.driverId)) warnings.push("driver_busy");
+    if (route.vehicleId && others.some((o) => o.vehicleId === route.vehicleId)) warnings.push("vehicle_busy");
+  }
+
+  return warnings;
 }

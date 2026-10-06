@@ -5,7 +5,7 @@ import type { Route, Driver, Vehicle } from "@prisma/client";
 import { createRoute, updateRoute, autosaveRouteDraft } from "./actions";
 import { FormSection, Field } from "@/components/forms/FormSection";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
-import { routeShiftLabels, routeStatusLabels, vehicleTypeLabels, toOptions } from "@/lib/labels";
+import { routeShiftLabels, vehicleTypeLabels, toOptions } from "@/lib/labels";
 import { toDateInputValue } from "@/lib/dates";
 import type { ActionResult } from "@/lib/validations";
 
@@ -159,17 +159,8 @@ export function RouteForm({
             ))}
           </select>
         </Field>
-        {route ? (
-          <Field label="Stato" htmlFor="status" error={errors?.status}>
-            <select id="status" name="status" defaultValue={route.status} className="field-input">
-              {toOptions(routeStatusLabels).map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-          </Field>
-        ) : (
-          <input type="hidden" name="status" value="DRAFT" />
-        )}
+        {/* Nessun campo "Stato": il giro si conferma solo col pulsante dedicato,
+            così il salvataggio (anche automatico) non può mai cambiarlo. */}
         <Field label="Ora partenza" htmlFor="departureTime" error={errors?.departureTime}>
           <input id="departureTime" name="departureTime" type="time" defaultValue={route?.departureTime ?? ""} className="field-input" />
         </Field>

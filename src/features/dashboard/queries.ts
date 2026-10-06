@@ -3,6 +3,7 @@ import { parseDateOnly } from "@/lib/dates";
 import { hasMissingData } from "@/lib/warnings";
 import { pickupInclude } from "@/features/pickups/queries";
 import { routeInclude } from "@/features/routes/queries";
+import { unassignedPickupsWhere } from "@/lib/pickup-where";
 
 /**
  * Statistiche operative del giorno, riutilizzate da /dashboard e /pianificazione.
@@ -11,9 +12,9 @@ import { routeInclude } from "@/features/routes/queries";
 export async function getDailyStats(branchId: string, dateStr: string) {
   const date = parseDateOnly(dateStr);
 
-  const [pickups, routes, availableVehicles] = await Promise.all([
+  const [pickups, routes, availableVehicles, unassigned] = await Promise.all([
     prisma.pickup.findMany({
-      where: { branchId, pickupDate: date, status: { not: "CANCELLED" } },
+      where: { branchId, pickupDate: date, cancelledAt: null },
       include: pickupInclude,
       orderBy: [{ priority: "desc" }, { timeWindow: "asc" }],
     }),
@@ -23,14 +24,14 @@ export async function getDailyStats(branchId: string, dateStr: string) {
       orderBy: [{ shift: "asc" }, { createdAt: "asc" }],
     }),
     prisma.vehicle.count({ where: { branchId, active: true } }),
+    // KPI "Non assegnate": STESSA regola della lista (recuperi dei giorni prima
+    // inclusi), così il numero coincide sempre con le prese elencate.
+    prisma.pickup.count({ where: unassignedPickupsWhere(branchId, dateStr) }),
   ]);
 
   const total = pickups.length;
   const recurring = pickups.filter((p) => p.sourceType === "RECURRING").length;
   const spot = pickups.filter((p) => p.sourceType === "SPOT").length;
-  const unassigned = pickups.filter(
-    (p) => p.routeStops.length === 0 && (p.status === "READY" || p.status === "DRAFT"),
-  ).length;
   const missingData = pickups.filter((p) => hasMissingData(p)).length;
 
   const usedVehicleIds = new Set(

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { KpiCard, KpiGrid } from "@/components/ui/KpiCard";
+import { CostBreakdownCards } from "@/components/ui/CostBreakdownCards";
 import { requireBranchId } from "@/lib/branch";
 import { getMonthlyStats } from "@/features/reports/monthly";
 import { formatEuro } from "@/lib/costs";
@@ -65,18 +66,7 @@ export default async function DashboardPage({
 
       {/* Costi del mese, separati per voce */}
       <h2 className="mb-2 mt-8 text-base font-semibold text-slate-900">Costi del mese (fino a oggi)</h2>
-      <KpiGrid>
-        <KpiCard label="Rama Trasporti" value={eur(stats.costs.rama)} />
-        <KpiCard label="Omar Trasporti" value={eur(stats.costs.omar)} />
-        <KpiCard label="Industriale ritiri" value={eur(stats.costs.industrialeRitiri)} hint="Giri autisti Eurosarda" />
-        <KpiCard label="Costo raccolta" value={eur(stats.costs.raccolta)} tone="blue" hint="Rama + Omar + Industriale ritiri" />
-        <KpiCard label="Trazioni" value={eur(stats.costs.trazioni)} />
-        <KpiCard label="Noli" value={eur(stats.costs.noli)} />
-        {stats.costs.nonClassificato > 0 ? (
-          <KpiCard label="Non classificato" value={eur(stats.costs.nonClassificato)} tone="amber" hint="Verificare l'azienda degli autisti" />
-        ) : null}
-        <KpiCard label="Costo totale" value={eur(stats.costs.total)} hint="Raccolta + trazioni + noli" />
-      </KpiGrid>
+      <CostBreakdownCards costs={stats.costs} draftCost={stats.draftCost} />
 
       {/* Classifiche + forecast */}
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -142,6 +132,10 @@ export default async function DashboardPage({
               <dd className="font-semibold text-brand-700">
                 {eur(stats.projectedCosts.raccolta)}
               </dd>
+            </div>
+            <div className="flex items-center justify-between">
+              <dt className="text-slate-500">Costo totale previsto</dt>
+              <dd className="font-semibold text-slate-800">{eur(stats.projectedCosts.total)}</dd>
             </div>
           </dl>
           {stats.workdaysRemaining > 0 ? (

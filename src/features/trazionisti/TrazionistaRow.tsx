@@ -13,6 +13,7 @@ export type Trazionista = {
   defaultCost: number | null;
   notes: string | null;
   active: boolean;
+  isEurosarda: boolean;
   carichiCount: number;
 };
 
@@ -39,6 +40,10 @@ function Fields({ t }: { t?: Trazionista }) {
         <label className="field-label">Note</label>
         <input name="notes" defaultValue={t?.notes ?? ""} className="field-input" />
       </div>
+      <label className="flex items-center gap-2 pb-2" title="I carichi di questo vettore sono trazioni industriali: il nolo va nel Costo Industriale.">
+        <input type="checkbox" name="isEurosarda" defaultChecked={t?.isEurosarda ?? false} className="h-4 w-4" />
+        <span className="text-sm text-slate-600">Vettore Eurosarda</span>
+      </label>
       <label className="flex items-center gap-2 pb-2">
         <input type="checkbox" name="active" defaultChecked={t ? t.active : true} className="h-4 w-4" />
         <span className="text-sm text-slate-600">Attivo</span>
@@ -78,6 +83,7 @@ export function TrazionistaRow({ t }: { t: Trazionista }) {
     <tr className="border-t border-slate-100">
       <td className="px-3 py-2">
         <span className="font-medium text-slate-800">{t.name}</span>
+        {t.isEurosarda ? <span className="ml-2"><Badge tone="blue">Eurosarda · Industriale</Badge></span> : null}
         {!t.active ? <span className="ml-2"><Badge tone="slate">Non attivo</Badge></span> : null}
       </td>
       <td className="whitespace-nowrap px-3 py-2">

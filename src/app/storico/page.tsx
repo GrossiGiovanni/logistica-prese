@@ -8,6 +8,8 @@ import { routeTotalCost, formatEuro } from "@/lib/costs";
 import { routeLabel, routeShiftLabels } from "@/lib/labels";
 import { formatDateIt, parseDateOnly, isValidDateInput, todayInputValue, addDaysInput } from "@/lib/dates";
 import { routeInclude } from "@/features/routes/queries";
+import { routeCostSelect } from "@/features/reports/daily";
+import { pickupStatusOf } from "@/lib/pickup-status";
 import type { Prisma } from "@prisma/client";
 
 export default async function StoricoPage({
@@ -31,7 +33,7 @@ export default async function StoricoPage({
   const pickupWhere: Prisma.PickupWhereInput = {
     branchId,
     pickupDate: dateRange,
-    status: { not: "CANCELLED" },
+    cancelledAt: null,
   };
   if (customerId) pickupWhere.customerId = customerId;
   // Se filtro per autista/mezzo, mostra le prese dei loro giri.
@@ -39,12 +41,16 @@ export default async function StoricoPage({
     pickupWhere.routeStops = { some: { route: { ...(driverId ? { driverId } : {}), ...(vehicleId ? { vehicleId } : {}) } } };
   }
 
-  const [routes, pickups, drivers, customers, vehicles] = await Promise.all([
+  // Le liste sono limitate per leggibilità; i TOTALI no: si calcolano su tutti
+  // i giri e tutte le prese del periodo filtrato.
+  const ROUTES_SHOWN = 200;
+  const PICKUPS_SHOWN = 300;
+  const [routes, pickups, drivers, customers, vehicles, allRoutes, pickupsCount] = await Promise.all([
     prisma.route.findMany({
       where: routeWhere,
       include: routeInclude,
       orderBy: [{ routeDate: "desc" }, { createdAt: "asc" }],
-      take: 200,
+      take: ROUTES_SHOWN,
     }),
     prisma.pickup.findMany({
       where: pickupWhere,
@@ -58,15 +64,17 @@ export default async function StoricoPage({
         },
       },
       orderBy: [{ pickupDate: "desc" }],
-      take: 300,
+      take: PICKUPS_SHOWN,
     }),
     prisma.driver.findMany({ where: { branchId, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.customer.findMany({ where: { branchId }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.vehicle.findMany({ where: { branchId, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.route.findMany({ where: routeWhere, select: routeCostSelect }),
+    prisma.pickup.count({ where: pickupWhere }),
   ]);
 
-  const totKm = routes.reduce((s, r) => s + (r.km ?? 0), 0);
-  const totCost = routes.reduce((s, r) => s + (routeTotalCost(r) ?? 0), 0);
+  const totKm = allRoutes.reduce((s, r) => s + (r.km ?? 0), 0);
+  const totCost = allRoutes.reduce((s, r) => s + (routeTotalCost(r) ?? 0), 0);
 
   return (
     <div>
@@ -122,8 +130,13 @@ export default async function StoricoPage({
         {/* GIRI */}
         <section>
           <h2 className="mb-2 text-base font-semibold text-slate-900">
-            Giri ({routes.length}) · {Math.round(totKm)} km · {formatEuro(totCost)}
+            Giri ({allRoutes.length}) · {Math.round(totKm)} km · {formatEuro(totCost)}
           </h2>
+          {allRoutes.length > routes.length ? (
+            <p className="mb-2 text-xs text-slate-500">
+              Totali calcolati su tutti i {allRoutes.length} giri; elenco limitato ai {routes.length} più recenti.
+            </p>
+          ) : null}
           {routes.length === 0 ? (
             <div className="card px-4 py-6 text-center text-sm text-slate-500">Nessun giro nel periodo con questi filtri.</div>
           ) : (
@@ -153,7 +166,10 @@ export default async function StoricoPage({
 
         {/* PRESE */}
         <section>
-          <h2 className="mb-2 text-base font-semibold text-slate-900">Prese ({pickups.length})</h2>
+          <h2 className="mb-2 text-base font-semibold text-slate-900">Prese ({pickupsCount})</h2>
+          {pickupsCount > pickups.length ? (
+            <p className="mb-2 text-xs text-slate-500">Elenco limitato alle {pickups.length} più recenti su {pickupsCount}.</p>
+          ) : null}
           {pickups.length === 0 ? (
             <div className="card px-4 py-6 text-center text-sm text-slate-500">Nessuna presa nel periodo con questi filtri.</div>
           ) : (
@@ -169,7 +185,7 @@ export default async function StoricoPage({
                           <span className="font-mono text-xs font-semibold text-brand-700">{p.pickupNumber}</span>
                         ) : null}
                         <span className="font-medium text-slate-800">{p.customer.name}</span>
-                        <PickupStatusBadge status={p.status} />
+                        <PickupStatusBadge status={pickupStatusOf(p)} />
                       </div>
                       <div className="text-xs text-slate-500">
                         {p.address.city} ({p.address.province}) · {p.pallets ?? "—"} plt

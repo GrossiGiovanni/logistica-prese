@@ -5,7 +5,7 @@ import { Badge } from "@/components/badges/Badge";
 import { RouteWarningBadges, MissingDataBadge } from "@/components/badges/WarningBadge";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { RouteForm } from "@/features/routes/RouteForm";
-import { getRoute } from "@/features/routes/queries";
+import { getRoute, listDayRoutesForWarnings } from "@/features/routes/queries";
 import { listUnassignedPickups } from "@/features/pickups/queries";
 import { listActiveDrivers } from "@/features/drivers/queries";
 import { listActiveVehicles } from "@/features/vehicles/queries";
@@ -56,10 +56,11 @@ export default async function GiroDettaglioPage({
   if (!route) notFound();
 
   const dateStr = toDateInputValue(route.routeDate);
-  const [unassigned, activeDrivers, activeVehicles] = await Promise.all([
+  const [unassigned, activeDrivers, activeVehicles, dayRoutes] = await Promise.all([
     listUnassignedPickups(branchId, dateStr, { search: q || undefined }),
     listActiveDrivers(branchId),
     listActiveVehicles(branchId),
+    listDayRoutesForWarnings(branchId, route.routeDate),
   ]);
 
   // Includi sempre autista/mezzo già assegnati tra le opzioni (anche se inattivi),
@@ -79,7 +80,7 @@ export default async function GiroDettaglioPage({
   const totalMeters = routeOccupiedMeters(route);
   const totalResi = routeResiCount(route);
   const totalCost = routeTotalCost(route);
-  const warnings = getRouteWarnings(route);
+  const warnings = getRouteWarnings(route, dayRoutes);
   const redirectTo = `/giri/${route.id}`;
 
   // Waypoint = coordinate salvate (le stesse del calcolo km), testo in riserva.

@@ -79,10 +79,10 @@ enum DriverCompany {
 // Filiale operativa (Milano, Torino, ...). Tutti i dati operativi sono separati
 // per filiale tramite il campo branchId.
 model Branch {
-  id       String  @id @default(cuid())
-  name     String
-  code     String  @unique
-  active   Boolean @default(true)
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  active    Boolean  @default(true)
   createdAt DateTime @default(now())
 
   customers        Customer[]
@@ -107,6 +107,8 @@ model Trazionista {
   branch      Branch?  @relation(fields: [branchId], references: [id])
   name        String // nome / vettore
   defaultCost Float? // costo di trazione / nolo predefinito
+  // Vettore Eurosarda: i suoi carichi sono trazioni industriali (Costo Industriale).
+  isEurosarda Boolean  @default(false)
   active      Boolean  @default(true)
   notes       String?
   createdAt   DateTime @default(now())
@@ -164,28 +166,29 @@ model Address {
 }
 
 model Driver {
-  id               String   @id @default(cuid())
+  id               String        @id @default(cuid())
   branchId         String?
-  branch           Branch?  @relation(fields: [branchId], references: [id])
+  branch           Branch?       @relation(fields: [branchId], references: [id])
   name             String
   code             String?
   phone            String? // Telefono/WhatsApp in formato internazionale (es. +39...)
-  whatsappEnabled  Boolean  @default(true)
+  whatsappEnabled  Boolean       @default(true)
   // Azienda dell'autista: unica fonte per la classificazione dei costi dei giri.
   company          DriverCompany @default(ALTRO)
   // Derivato da company (= EUROSARDA), mantenuto allineato in scrittura per
   // compatibilità. Non usarlo per i calcoli.
-  isEurosarda      Boolean  @default(false)
+  isEurosarda      Boolean       @default(false)
   defaultVehicleId String?
-  active           Boolean  @default(true)
+  active           Boolean       @default(true)
   notes            String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
-  defaultVehicle Vehicle? @relation("DriverDefaultVehicle", fields: [defaultVehicleId], references: [id], onDelete: SetNull)
+  defaultVehicle Vehicle?     @relation("DriverDefaultVehicle", fields: [defaultVehicleId], references: [id], onDelete: SetNull)
   routes         Route[]
   trailerLogs    TrailerLog[]
   tractions      Traction[]
+  carichi        Carico[]
 
   @@index([active])
   @@index([branchId])
@@ -212,7 +215,7 @@ model Vehicle {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
-  routes        Route[]
+  routes            Route[]
   defaultForDrivers Driver[] @relation("DriverDefaultVehicle")
 
   @@index([active])
@@ -229,7 +232,12 @@ model Pickup {
   customerId        String
   addressId         String
   sourceType        PickupSourceType @default(SPOT)
+  // DEPRECATO: lo stato operativo ora è CALCOLATO (giro / dati di carico) e non
+  // viene più letto né scritto dall'app. Resta solo durante la transizione e
+  // sarà rimosso con una migrazione dedicata (vedi src/lib/pickup-status.ts).
   status            PickupStatus     @default(DRAFT)
+  // Unico stato persistito: annullamento della presa.
+  cancelledAt       DateTime?
   timeWindow        TimeWindow       @default(ANYTIME)
   timeFrom          String?
   timeTo            String?
@@ -258,6 +266,7 @@ model Pickup {
 
   // Anti-duplicato: una sola presa generata per ricorrenza+data
   @@unique([pickupDate, recurringPickupId])
+  @@index([cancelledAt])
   @@index([pickupDate])
   @@index([status])
   @@index([sourceType])
@@ -267,32 +276,32 @@ model Pickup {
 }
 
 model RecurringPickup {
-  id                     String     @id @default(cuid())
-  branchId               String?
-  branch                 Branch?    @relation(fields: [branchId], references: [id])
-  customerId             String
-  addressId              String
-  active                 Boolean    @default(true)
-  monday                 Boolean    @default(false)
-  tuesday                Boolean    @default(false)
-  wednesday              Boolean    @default(false)
-  thursday               Boolean    @default(false)
-  friday                 Boolean    @default(false)
-  saturday               Boolean    @default(false)
-  sunday                 Boolean    @default(false)
-  defaultTimeWindow      TimeWindow @default(ANYTIME)
-  defaultTimeFrom        String?
-  defaultTimeTo          String?
-  defaultPallets         Int?
-  defaultColli           Int?
-  defaultWeightKg        Float?
-  defaultVolumeM3        Float?
-  defaultRequiresTailLift Boolean   @default(false)
-  defaultRequiresMotrice Boolean    @default(false)
-  defaultPriority        Priority   @default(NORMAL)
-  defaultNotes           String?
-  createdAt              DateTime   @default(now())
-  updatedAt              DateTime   @updatedAt
+  id                      String     @id @default(cuid())
+  branchId                String?
+  branch                  Branch?    @relation(fields: [branchId], references: [id])
+  customerId              String
+  addressId               String
+  active                  Boolean    @default(true)
+  monday                  Boolean    @default(false)
+  tuesday                 Boolean    @default(false)
+  wednesday               Boolean    @default(false)
+  thursday                Boolean    @default(false)
+  friday                  Boolean    @default(false)
+  saturday                Boolean    @default(false)
+  sunday                  Boolean    @default(false)
+  defaultTimeWindow       TimeWindow @default(ANYTIME)
+  defaultTimeFrom         String?
+  defaultTimeTo           String?
+  defaultPallets          Int?
+  defaultColli            Int?
+  defaultWeightKg         Float?
+  defaultVolumeM3         Float?
+  defaultRequiresTailLift Boolean    @default(false)
+  defaultRequiresMotrice  Boolean    @default(false)
+  defaultPriority         Priority   @default(NORMAL)
+  defaultNotes            String?
+  createdAt               DateTime   @default(now())
+  updatedAt               DateTime   @updatedAt
 
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   address  Address  @relation(fields: [addressId], references: [id], onDelete: Cascade)
@@ -303,21 +312,21 @@ model RecurringPickup {
 }
 
 model Route {
-  id            String      @id @default(cuid())
-  branchId      String?
-  branch        Branch?     @relation(fields: [branchId], references: [id])
-  routeDate     DateTime    @db.Date
-  driverId      String?
-  vehicleId     String?
-  shift         RouteShift  @default(FULL_DAY)
-  status        RouteStatus @default(DRAFT)
-  departureTime String? // Ora partenza (HH:MM)
-  returnTime    String? // Ora rientro (HH:MM)
-  km            Float? // Km percorsi (inserimento manuale)
+  id                 String      @id @default(cuid())
+  branchId           String?
+  branch             Branch?     @relation(fields: [branchId], references: [id])
+  routeDate          DateTime    @db.Date
+  driverId           String?
+  vehicleId          String?
+  shift              RouteShift  @default(FULL_DAY)
+  status             RouteStatus @default(DRAFT)
+  departureTime      String? // Ora partenza (HH:MM)
+  returnTime         String? // Ora rientro (HH:MM)
+  km                 Float? // Km percorsi (inserimento manuale)
   lastWhatsappSentAt DateTime? // Storico ultimo invio del giro su WhatsApp
-  notes         String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  notes              String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
 
   driver  Driver?     @relation(fields: [driverId], references: [id], onDelete: SetNull)
   vehicle Vehicle?    @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
@@ -356,8 +365,10 @@ model Reso {
   @@index([branchId])
 }
 
-// Trazione Eurosarda: tratta effettuata manualmente (punto A -> punto B),
-// con km calcolati e costo che entra nei totali/report giornalieri e mensili.
+// DEPRECATO: vecchia sezione "Trazioni", sostituita dai Carichi (un carico
+// fatto da Eurosarda è una trazione industriale). Nessun codice la usa più e
+// non entra in alcun costo: la tabella resta solo come archivio fino alla
+// migrazione di pulizia (DROP), da eseguire con backup verificato.
 model Traction {
   id           String   @id @default(cuid())
   branchId     String?
@@ -402,27 +413,31 @@ model TrailerLog {
 // Carico manuale: informazioni di carico gestite a mano dal magazzino,
 // indipendenti da prese e giri (nessun collegamento alla pianificazione).
 model Carico {
-  id          String   @id @default(cuid())
-  branchId    String?
-  branch      Branch?  @relation(fields: [branchId], references: [id])
-  loadDate    DateTime @db.Date
-  carrier     String // vettore
-  nolo        Float? // nolo / costo di trazione del carico
+  id            String       @id @default(cuid())
+  branchId      String?
+  branch        Branch?      @relation(fields: [branchId], references: [id])
+  loadDate      DateTime     @db.Date
+  carrier       String // vettore
+  nolo          Float? // nolo / costo di trazione del carico
   trazionistaId String?
   trazionista   Trazionista? @relation(fields: [trazionistaId], references: [id], onDelete: SetNull)
-  plate       String? // targa
-  destination String? // destinazione
-  reference   String? // riferimento / n. documento
-  pallets     Int?
-  colli       Int?
-  weightKg    Float?
-  volumeM3    Float?
-  notes       String? // note di carico
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  // Autista Eurosarda che ha effettuato il carico (trazione industriale).
+  driverId      String?
+  driver        Driver?      @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  plate         String? // targa
+  destination   String? // destinazione
+  reference     String? // riferimento / n. documento
+  pallets       Int?
+  colli         Int?
+  weightKg      Float?
+  volumeM3      Float?
+  notes         String? // note di carico
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   @@index([loadDate])
   @@index([branchId])
+  @@index([driverId])
 }
 
 model ImportLog {
@@ -455,9 +470,9 @@ model RouteStop {
   pickup Pickup? @relation(fields: [pickupId], references: [id], onDelete: Cascade)
   reso   Reso?   @relation(fields: [resoId], references: [id], onDelete: Cascade)
 
-  @@unique([routeId, pickupId])
-  @@unique([routeId, resoId])
+  // Una presa (o un reso) può stare in UN SOLO giro: assegnarla a un altro
+  // giro la sposta. I valori nulli non collidono (fermata presa vs fermata reso).
+  @@unique([pickupId])
+  @@unique([resoId])
   @@index([routeId])
-  @@index([pickupId])
-  @@index([resoId])
 }

@@ -147,8 +147,9 @@ export const pickupSchema = z.object({
   pickupDate: dateOnly,
   customerId: requiredString,
   addressId: requiredString,
-  sourceType: pickupSourceType,
-  status: pickupStatus,
+  // Stato e origine NON si scelgono a mano: lo stato è calcolato (giro / dati di
+  // carico; l'annullamento ha la sua azione) e l'origine la decide il sistema
+  // (presa inserita a mano = SPOT, generata da ricorrenza = RECURRING).
   timeWindow,
   timeFrom: optionalString,
   timeTo: optionalString,
@@ -215,12 +216,13 @@ export type RecurringPickupInput = z.infer<typeof recurringPickupSchema>;
 // Route
 // ---------------------------------------------------------------------------
 
+// Lo stato del giro NON fa parte del form: si conferma solo col pulsante
+// dedicato (setRouteStatus). Un campo "status" eventualmente inviato viene scartato.
 export const routeSchema = z.object({
   routeDate: dateOnly,
   driverId: optionalString,
   vehicleId: optionalString,
   shift: routeShift,
-  status: routeStatus,
   departureTime: optionalString,
   returnTime: optionalString,
   km: optionalFloat,

@@ -19,7 +19,6 @@ const nav: NavItem[] = [
     children: [
       { href: "/pianificazione", label: "Pianificazione" },
       { href: "/pianificazione-plus", label: "Pianificazione Plus" },
-      { href: "/pianificazione-fabio", label: "Pianificazione Fabio" },
     ],
   },
   {
@@ -40,7 +39,6 @@ const nav: NavItem[] = [
       { href: "/report-mensile", label: "Report mensile" },
       { href: "/resi", label: "Resi" },
       { href: "/autisti-eurosarda", label: "Autisti Eurosarda" },
-      { href: "/trazioni", label: "Trazioni Eurosarda" },
     ],
   },
   {

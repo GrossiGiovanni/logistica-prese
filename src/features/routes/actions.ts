@@ -5,12 +5,13 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireBranchId } from "@/lib/branch";
 import { routeSchema, parseForm, type ActionResult } from "@/lib/validations";
-import { parseDateOnly, isValidDateInput } from "@/lib/dates";
 import { computeRouteKm } from "@/lib/distance";
+import { routeEditableData } from "./route-data";
 
 function revalidateRoutes(routeId?: string) {
   revalidatePath("/giri");
   revalidatePath("/pianificazione");
+  revalidatePath("/pianificazione-plus");
   revalidatePath("/dashboard");
   if (routeId) revalidatePath(`/giri/${routeId}`);
 }
@@ -18,7 +19,7 @@ function revalidateRoutes(routeId?: string) {
 /**
  * Ricalcola e salva i km del giro (magazzino → fermate in ordine → magazzino)
  * tramite Google Directions. Best-effort: se la chiave manca o l'API fallisce,
- * azzera a null senza interrompere l'operazione chiamante.
+ * non sovrascrive l'ultimo km valido e non interrompe l'operazione chiamante.
  */
 export async function recalcRouteKm(routeId: string): Promise<void> {
   try {
@@ -47,8 +48,6 @@ export async function recalcRouteKm(routeId: string): Promise<void> {
       .map((s) => s.pickup?.address ?? s.reso?.address)
       .filter((a): a is NonNullable<typeof a> => a != null);
     const result = await computeRouteKm(addresses);
-    // Salva solo se abbiamo un km valido o se il giro è vuoto (km=null corretto).
-    // In caso di chiave assente o errore API NON sovrascrive l'ultimo km buono.
     if (result.km != null || result.reason === "no_stops") {
       await prisma.route.update({ where: { id: routeId }, data: { km: result.km } });
     }
@@ -58,20 +57,42 @@ export async function recalcRouteKm(routeId: string): Promise<void> {
 }
 
 /**
- * Stato a cui torna una presa rimossa da un giro: READY se ha un dato di carico
- * (pallet, metri lineari o m³), altrimenti DRAFT.
+ * Colloca una presa (o un reso) in un giro, oppure lo toglie da ogni giro
+ * (routeId = null). Una presa sta in UN SOLO giro: se è già in un altro, viene
+ * SPOSTATA. Tutto in transazione; restituisce i giri toccati (per i km).
+ * Lo stato della presa non si scrive: "Pianificata" deriva dal giro stesso.
  */
-function unplannedStatus(p: {
-  pallets: number | null;
-  loadingMeters: number | null;
-  volumeM3: number | null;
-}): "READY" | "DRAFT" {
-  return p.pallets != null || p.loadingMeters != null || p.volumeM3 != null
-    ? "READY"
-    : "DRAFT";
+async function placeStop(
+  item: { pickupId: string } | { resoId: string },
+  routeId: string | null,
+): Promise<string[]> {
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.routeStop.findFirst({ where: item, select: { id: true, routeId: true } });
+    if (current && current.routeId === routeId) return []; // già in quel giro
+
+    const touched: string[] = [];
+    if (current) {
+      await tx.routeStop.delete({ where: { id: current.id } });
+      touched.push(current.routeId);
+    }
+    if (routeId) {
+      const last = await tx.routeStop.findFirst({
+        where: { routeId },
+        orderBy: { sequence: "desc" },
+        select: { sequence: true },
+      });
+      await tx.routeStop.create({ data: { ...item, routeId, sequence: (last?.sequence ?? 0) + 1 } });
+      touched.push(routeId);
+    }
+    return touched;
+  });
 }
 
-/** Crea un nuovo giro e reindirizza al suo dettaglio. */
+async function recalcAll(routeIds: string[]): Promise<void> {
+  for (const id of new Set(routeIds)) await recalcRouteKm(id);
+}
+
+/** Crea un nuovo giro (in bozza) e reindirizza al suo dettaglio. */
 export async function createRoute(
   _prev: ActionResult | null,
   formData: FormData,
@@ -79,28 +100,20 @@ export async function createRoute(
   const parsed = parseForm(routeSchema, formData);
   if (!parsed.success) return parsed.result;
 
-  const { routeDate, driverId, vehicleId, ...rest } = parsed.data;
   const branchId = await requireBranchId();
-  const route = await prisma.route.create({
-    data: {
-      ...rest,
-      branchId,
-      routeDate: parseDateOnly(routeDate),
-      driverId: driverId ?? null,
-      vehicleId: vehicleId ?? null,
-    },
-  });
+  // Nessuno stato dal form: un giro nuovo nasce in bozza (default del database).
+  const route = await prisma.route.create({ data: { ...routeEditableData(parsed.data), branchId } });
 
   revalidateRoutes();
   redirect(`/giri/${route.id}`);
 }
 
 /**
- * Salvataggio automatico del giro come BOZZA.
- * Usata dal form mentre l'operatore compila: se cambia pagina, i dati inseriti
- * (autista, mezzo, fascia, orari, note) non vanno persi. Non reindirizza e non
- * declassa un giro già confermato; alla prima chiamata crea la bozza e
- * restituisce l'id, che il form riusa per i salvataggi successivi.
+ * Salvataggio automatico del giro.
+ * Usato dal form mentre l'operatore compila: se cambia pagina, i dati inseriti
+ * (autista, mezzo, fascia, orari, note) non vanno persi. NON tocca mai lo stato
+ * del giro (si conferma solo col pulsante dedicato). Alla prima chiamata crea
+ * la bozza e restituisce l'id, che il form riusa per i salvataggi successivi.
  */
 export async function autosaveRouteDraft(
   formData: FormData,
@@ -109,25 +122,17 @@ export async function autosaveRouteDraft(
   const parsed = parseForm(routeSchema, formData);
   if (!parsed.success) return { ok: false, error: "Dati non validi" };
 
-  const { routeDate, driverId, vehicleId, ...rest } = parsed.data;
-  const common = {
-    ...rest,
-    routeDate: parseDateOnly(routeDate),
-    driverId: driverId ?? null,
-    vehicleId: vehicleId ?? null,
-  };
+  const data = routeEditableData(parsed.data);
 
   try {
     if (id) {
-      await prisma.route.update({ where: { id }, data: common });
+      await prisma.route.update({ where: { id }, data });
       revalidateRoutes(id);
       return { ok: true, id };
     }
     // Primo salvataggio: crea la bozza solo quando c'è già qualcosa di utile.
-    if (!common.driverId && !common.vehicleId) return { ok: false };
-    const route = await prisma.route.create({
-      data: { ...common, status: "DRAFT", branchId: await requireBranchId() },
-    });
+    if (!data.driverId && !data.vehicleId) return { ok: false };
+    const route = await prisma.route.create({ data: { ...data, branchId: await requireBranchId() } });
     revalidateRoutes();
     return { ok: true, id: route.id };
   } catch {
@@ -135,7 +140,7 @@ export async function autosaveRouteDraft(
   }
 }
 
-/** Aggiorna autista/mezzo/fascia/stato/note del giro. */
+/** Aggiorna autista/mezzo/fascia/orari/note del giro (mai lo stato). */
 export async function updateRoute(
   _prev: ActionResult | null,
   formData: FormData,
@@ -146,16 +151,7 @@ export async function updateRoute(
   const parsed = parseForm(routeSchema, formData);
   if (!parsed.success) return parsed.result;
 
-  const { routeDate, driverId, vehicleId, ...rest } = parsed.data;
-  await prisma.route.update({
-    where: { id },
-    data: {
-      ...rest,
-      routeDate: parseDateOnly(routeDate),
-      driverId: driverId ?? null,
-      vehicleId: vehicleId ?? null,
-    },
-  });
+  await prisma.route.update({ where: { id }, data: routeEditableData(parsed.data) });
 
   revalidateRoutes(id);
   return { ok: true };
@@ -178,69 +174,38 @@ export async function recalculateRouteKm(formData: FormData): Promise<void> {
   redirect(`/giri/${id}`);
 }
 
-/** Cambia lo stato del giro (DRAFT/CONFIRMED). */
+/** Cambia lo stato del giro (DRAFT/CONFIRMED): UNICO punto che scrive lo stato. */
 export async function setRouteStatus(formData: FormData): Promise<void> {
   const id = formData.get("id") as string;
-  const status = formData.get("status") as "DRAFT" | "CONFIRMED";
-  if (!id) return;
+  const status = formData.get("status");
+  if (!id || (status !== "DRAFT" && status !== "CONFIRMED")) return;
   await prisma.route.update({ where: { id }, data: { status } });
   revalidateRoutes(id);
   redirect(`/giri/${id}`);
 }
 
-/** Elimina un giro: le prese assegnate tornano disponibili. */
+/** Elimina un giro: le sue fermate spariscono e le prese tornano da assegnare. */
 export async function deleteRoute(formData: FormData): Promise<void> {
   const id = formData.get("id") as string;
   const redirectTo = (formData.get("redirectTo") as string) || "/giri";
   if (!id) return;
 
-  const stops = await prisma.routeStop.findMany({
-    where: { routeId: id },
-    include: {
-      pickup: {
-        select: { id: true, pallets: true, loadingMeters: true, volumeM3: true, status: true },
-      },
-    },
-  });
-
-  const plannedPickups = stops
-    .map((s) => s.pickup)
-    .filter((p): p is NonNullable<typeof p> => p != null && p.status === "PLANNED");
-
-  await prisma.$transaction([
-    prisma.route.delete({ where: { id } }), // cascade cancella i RouteStop
-    ...plannedPickups.map((p) =>
-      prisma.pickup.update({ where: { id: p.id }, data: { status: unplannedStatus(p) } }),
-    ),
-  ]);
+  // La cascata rimuove le fermate: lo stato delle prese è calcolato, quindi
+  // tornano automaticamente "Pronta"/"Da completare" senza altri aggiornamenti.
+  await prisma.route.delete({ where: { id } });
 
   revalidateRoutes();
   redirect(redirectTo);
 }
 
-/** Assegna una presa a un giro (in coda) e la porta in stato PLANNED. */
+/** Assegna una presa a un giro (in coda). Se era in un altro giro, viene spostata. */
 export async function assignPickupToRoute(formData: FormData): Promise<void> {
   const routeId = formData.get("routeId") as string;
   const pickupId = formData.get("pickupId") as string;
   const redirectTo = (formData.get("redirectTo") as string) || `/giri/${routeId}`;
   if (!routeId || !pickupId) return;
 
-  const existing = await prisma.routeStop.findUnique({
-    where: { routeId_pickupId: { routeId, pickupId } },
-  });
-  if (!existing) {
-    const last = await prisma.routeStop.findFirst({
-      where: { routeId },
-      orderBy: { sequence: "desc" },
-      select: { sequence: true },
-    });
-    const nextSeq = (last?.sequence ?? 0) + 1;
-    await prisma.$transaction([
-      prisma.routeStop.create({ data: { routeId, pickupId, sequence: nextSeq } }),
-      prisma.pickup.update({ where: { id: pickupId }, data: { status: "PLANNED" } }),
-    ]);
-    await recalcRouteKm(routeId);
-  }
+  await recalcAll(await placeStop({ pickupId }, routeId));
 
   revalidateRoutes(routeId);
   redirect(redirectTo);
@@ -250,96 +215,33 @@ export async function assignPickupToRoute(formData: FormData): Promise<void> {
  * Imposta il giro di una presa in un colpo solo (per Pianificazione Plus):
  * routeId valorizzato → sposta/assegna la presa a quel giro;
  * routeId vuoto → la presa torna "da assegnare".
- * Ricalcola i km di tutti i giri coinvolti.
  */
 export async function setPickupRoute(formData: FormData): Promise<void> {
   const pickupId = formData.get("pickupId") as string;
-  const routeId = ((formData.get("routeId") as string) || "").trim();
+  const routeId = ((formData.get("routeId") as string) || "").trim() || null;
   const redirectTo = (formData.get("redirectTo") as string) || "/pianificazione-plus";
   if (!pickupId) return;
 
-  const existing = await prisma.routeStop.findMany({
-    where: { pickupId },
-    select: { routeId: true },
-  });
-  const oldRouteIds = [...new Set(existing.map((s) => s.routeId))].filter((id) => id !== routeId);
+  await recalcAll(await placeStop({ pickupId }, routeId));
 
-  // Rimuove la presa dagli altri giri.
-  if (oldRouteIds.length > 0) {
-    await prisma.routeStop.deleteMany({
-      where: { pickupId, routeId: { in: oldRouteIds } },
-    });
-  }
-
-  if (routeId) {
-    const alreadyThere = existing.some((s) => s.routeId === routeId);
-    if (!alreadyThere) {
-      const last = await prisma.routeStop.findFirst({
-        where: { routeId },
-        orderBy: { sequence: "desc" },
-        select: { sequence: true },
-      });
-      await prisma.$transaction([
-        prisma.routeStop.create({
-          data: { routeId, pickupId, sequence: (last?.sequence ?? 0) + 1 },
-        }),
-        prisma.pickup.update({ where: { id: pickupId }, data: { status: "PLANNED" } }),
-      ]);
-    }
-    await recalcRouteKm(routeId);
-  } else {
-    const pickup = await prisma.pickup.findUnique({
-      where: { id: pickupId },
-      select: { pallets: true, loadingMeters: true, volumeM3: true, status: true },
-    });
-    if (pickup && pickup.status === "PLANNED") {
-      await prisma.pickup.update({
-        where: { id: pickupId },
-        data: { status: unplannedStatus(pickup) },
-      });
-    }
-  }
-
-  for (const old of oldRouteIds) {
-    await recalcRouteKm(old);
-  }
-
-  revalidateRoutes(routeId || undefined);
+  revalidateRoutes(routeId ?? undefined);
   redirect(redirectTo);
 }
 
-/** Assegna/rimuove un reso da un giro (routeId vuoto = riporta tra i non assegnati). */
+/** Assegna/sposta/rimuove un reso da un giro (routeId vuoto = nessun giro). */
 export async function setResoRoute(formData: FormData): Promise<void> {
   const resoId = formData.get("resoId") as string;
-  const routeId = ((formData.get("routeId") as string) || "").trim();
+  const routeId = ((formData.get("routeId") as string) || "").trim() || null;
   const redirectTo = (formData.get("redirectTo") as string) || "/pianificazione";
   if (!resoId) return;
 
-  const existing = await prisma.routeStop.findMany({ where: { resoId }, select: { routeId: true } });
-  const oldRouteIds = [...new Set(existing.map((s) => s.routeId))].filter((id) => id !== routeId);
+  await recalcAll(await placeStop({ resoId }, routeId));
 
-  if (oldRouteIds.length > 0) {
-    await prisma.routeStop.deleteMany({ where: { resoId, routeId: { in: oldRouteIds } } });
-  }
-  if (routeId && !existing.some((s) => s.routeId === routeId)) {
-    const last = await prisma.routeStop.findFirst({
-      where: { routeId },
-      orderBy: { sequence: "desc" },
-      select: { sequence: true },
-    });
-    await prisma.routeStop.create({
-      data: { routeId, resoId, sequence: (last?.sequence ?? 0) + 1 },
-    });
-  }
-
-  if (routeId) await recalcRouteKm(routeId);
-  for (const old of oldRouteIds) await recalcRouteKm(old);
-
-  revalidateRoutes(routeId || undefined);
+  revalidateRoutes(routeId ?? undefined);
   redirect(redirectTo);
 }
 
-/** Rimuove una presa da un giro; se non è in altri giri, torna disponibile. */
+/** Rimuove una presa da un giro: torna da assegnare. */
 export async function removePickupFromRoute(formData: FormData): Promise<void> {
   const routeId = formData.get("routeId") as string;
   const pickupId = formData.get("pickupId") as string;
@@ -348,20 +250,6 @@ export async function removePickupFromRoute(formData: FormData): Promise<void> {
 
   await prisma.routeStop.deleteMany({ where: { routeId, pickupId } });
   await recalcRouteKm(routeId);
-
-  const stillAssigned = await prisma.routeStop.count({ where: { pickupId } });
-  if (stillAssigned === 0) {
-    const pickup = await prisma.pickup.findUnique({
-      where: { id: pickupId },
-      select: { pallets: true, loadingMeters: true, volumeM3: true, status: true },
-    });
-    if (pickup && pickup.status === "PLANNED") {
-      await prisma.pickup.update({
-        where: { id: pickupId },
-        data: { status: unplannedStatus(pickup) },
-      });
-    }
-  }
 
   revalidateRoutes(routeId);
   redirect(redirectTo);

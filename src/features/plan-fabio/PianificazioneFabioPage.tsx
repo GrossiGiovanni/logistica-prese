@@ -2,14 +2,20 @@
 // ognuna con filtri PROPRI e indipendenti. Serve a confrontare quattro
 // pianificazioni/filtri diversi contemporaneamente senza cambiare pagina.
 // NB: non sostituisce la Pianificazione standard; ne riusa la stessa logica.
+//
+// ARCHIVIATA: la schermata è stata tolta dalla navigazione e dalle route
+// dell'app (non è raggiungibile). Il codice resta qui per un eventuale
+// riutilizzo: per riattivarla basta ricreare src/app/pianificazione-fabio/page.tsx
+// con  export { default } from "@/features/plan-fabio/PianificazioneFabioPage";
+// e rimettere la voce nel menu (components/layout/Sidebar.tsx).
 
 import { PageHeader } from "@/components/ui/PageHeader";
 import { requireBranchId, listBranches } from "@/lib/branch";
 import { getOpDate } from "@/lib/persisted-filters";
 import { tomorrowInputValue, isValidDateInput, safeDateInput } from "@/lib/dates";
-import { getQuadrantData, type QuadrantFilters } from "@/features/plan-fabio/queries";
-import { Quadrant } from "@/features/plan-fabio/Quadrant";
-import type { QuadrantCurrent } from "@/features/plan-fabio/QuadrantFilters";
+import { getQuadrantData, type QuadrantFilters } from "./queries";
+import { Quadrant } from "./Quadrant";
+import type { QuadrantCurrent } from "./QuadrantFilters";
 
 export default async function PianificazioneFabioPage({
   searchParams,

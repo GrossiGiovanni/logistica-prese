@@ -52,7 +52,7 @@ export function DriverForm({
           label="Azienda *"
           htmlFor="company"
           error={errors?.company}
-          hint="Decide la voce di costo dei suoi giri: Rama / Omar Trasporti oppure Industriale ritiri (Eurosarda). «Altro» finisce in «non classificato»."
+          hint="Decide la voce di costo dei suoi giri: Rama / Omar Trasporti oppure Industriale ritiri (Eurosarda). «Altro» finisce in «non classificato». I carichi fatti da un autista Eurosarda sono trazioni industriali (Costo Industriale)."
         >
           <select id="company" name="company" defaultValue={driver?.company ?? "ALTRO"} required className="field-input">
             {(Object.keys(driverCompanyLabels) as DriverCompanyKey[]).map((c) => (

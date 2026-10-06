@@ -11,10 +11,11 @@ import { PickupFiltersBar } from "@/features/pickups/PickupFilters";
 import { hasMissingData } from "@/lib/warnings";
 import { pickupSourceLabels, timeWindowLabels, priorityLabels, routeStatusLabels, routeLabel } from "@/lib/labels";
 import { formatDateIt, todayInputValue, addDaysInput, parseDateOnly, safeDateInput } from "@/lib/dates";
+import { parsePickupStatusFilter, pickupStatusOf } from "@/lib/pickup-status";
 import { getPreseFilters, getOpDate } from "@/lib/persisted-filters";
 import { requireBranchId } from "@/lib/branch";
 import { RouteStatusBadge } from "@/components/badges/StatusBadge";
-import type { PickupStatus, PickupSourceType, TimeWindow } from "@prisma/client";
+import type { PickupSourceType, TimeWindow } from "@prisma/client";
 
 export default async function PresePage({
   searchParams,
@@ -31,7 +32,7 @@ export default async function PresePage({
 
   const filters = {
     date: searching ? undefined : viewDate,
-    status: (saved.status as PickupStatus) || undefined,
+    status: parsePickupStatusFilter(saved.status),
     sourceType: (saved.sourceType as PickupSourceType) || undefined,
     timeWindow: (saved.timeWindow as TimeWindow) || undefined,
     search: saved.search || undefined,
@@ -89,7 +90,7 @@ export default async function PresePage({
       header: "Stato",
       cell: (p) => (
         <div className="flex flex-col items-start gap-1">
-          <PickupStatusBadge status={p.status} />
+          <PickupStatusBadge status={pickupStatusOf(p)} />
           {hasMissingData(p) ? <MissingDataBadge /> : null}
         </div>
       ),

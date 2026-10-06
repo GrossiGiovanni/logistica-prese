@@ -130,6 +130,7 @@ Su PowerShell usa `$env:DATABASE_URL = "postgresql://..."` al posto di `export`.
 | `npm run db:backup:verify` | Verifica un backup con ripristino reale |
 | `npm run db:studio` | Apre Prisma Studio |
 | `npm run db:seed` | **Solo sviluppo/test** — dati demo su DB locale (rifiuta la produzione) |
+| `npm test` | Test automatici della logica (costi, report, date, import AS400, stati, warning) |
 
 ## Funzionalità implementate
 
@@ -144,7 +145,20 @@ Su PowerShell usa `$env:DATABASE_URL = "postgresql://..."` al posto di `export`.
   assegnate, giri del giorno, KPI e assegnazione rapida.
 - **Dashboard** (`/dashboard`): KPI giornalieri e liste sintetiche.
 - **Warning** su prese e giri (dati mancanti, capacità superata, motrice usata,
-  mezzo/autista mancante, ecc.).
+  mezzo/autista mancante, autista/mezzo già impegnati, ecc.): un'unica funzione
+  `getRouteWarnings` usata ovunque.
+- **Carichi** (`/carichi`): unica fonte delle trazioni. Un carico fatto da un
+  autista Eurosarda (o con vettore marcato «Vettore Eurosarda» in Anagrafica →
+  Trazionisti) è una trazione industriale: il nolo va nel **Costo Industriale**.
+  Gli altri carichi sono noli esterni. La vecchia sezione «Trazioni» è stata
+  rimossa (tabella `Traction` conservata solo come archivio).
+- **Costi** (Home, Pianificazione, Report mensile, export «Costi e km»): Rama,
+  Omar, Costo Industriale (ritiri Eurosarda + trazioni Eurosarda), noli esterni,
+  non classificato; le voci sommano sempre il costo totale. Dettagli in
+  [`docs/database.md`](docs/database.md).
+- **Pianificazione Fabio**: archiviata (non raggiungibile, fuori dal menu). Il
+  codice è conservato in `src/features/plan-fabio/`; per riattivarla vedi il
+  commento in testa a `PianificazioneFabioPage.tsx`.
 
 ## Funzionalità escluse (fase MVP)
 

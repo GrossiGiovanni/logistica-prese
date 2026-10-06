@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { KpiCard, KpiGrid } from "@/components/ui/KpiCard";
+import { CostBreakdownCards } from "@/components/ui/CostBreakdownCards";
 import { Badge } from "@/components/badges/Badge";
 import { RouteStatusBadge } from "@/components/badges/StatusBadge";
 import { MissingDataBadge, RouteWarningBadges } from "@/components/badges/WarningBadge";
@@ -19,7 +20,6 @@ import {
   routeOccupiedMeters,
   routeUsesMotrice,
   getRouteWarnings,
-  findResourceOverlaps,
   hasMissingData,
 } from "@/lib/warnings";
 import { routeTotalCost, formatEuro } from "@/lib/costs";
@@ -37,7 +37,6 @@ import {
 import { getPianFilters, getOpDate } from "@/lib/persisted-filters";
 import type { TimeWindow, Priority } from "@prisma/client";
 
-const eurOrDash = (v: number) => (v > 0 ? formatEuro(Math.round(v)) : "—");
 
 export default async function PianificazionePage({
   searchParams,
@@ -72,11 +71,7 @@ export default async function PianificazionePage({
     }),
   ]);
 
-  // Conflitti di risorsa (stesso mezzo/autista su fasce sovrapposte) — solo tra i
-  // giri effettivamente impegnati (con almeno una presa): un giro vuoto non è in conflitto.
-  const overlapIds = findResourceOverlaps(routes.filter((r) => r.stops.length > 0));
-
-  // Costi della giornata ripartiti (stessa logica dei report mensili).
+  // Costi della giornata ripartiti (stessa logica di Home e report mensile).
   const costs = await getDailyCosts(branchId, selectedDate);
 
   return (
@@ -111,23 +106,7 @@ export default async function PianificazionePage({
 
       {/* Costi della giornata per voce (giri confermati; le bozze a parte) */}
       <div className="mt-3">
-        <KpiGrid>
-          <KpiCard label="Rama Trasporti" value={eurOrDash(costs.rama)} />
-          <KpiCard label="Omar Trasporti" value={eurOrDash(costs.omar)} />
-          <KpiCard label="Industriale ritiri" value={eurOrDash(costs.industrialeRitiri)} />
-          <KpiCard
-            label="Costo raccolta"
-            value={eurOrDash(costs.raccolta)}
-            tone="blue"
-            hint={costs.draftCost > 0 ? `+ ${formatEuro(Math.round(costs.draftCost))} in giri in bozza (esclusi)` : "Rama + Omar + Industriale ritiri"}
-          />
-          <KpiCard label="Trazioni" value={eurOrDash(costs.trazioni)} />
-          <KpiCard label="Noli" value={eurOrDash(costs.noli)} />
-          {costs.nonClassificato > 0 ? (
-            <KpiCard label="Non classificato" value={eurOrDash(costs.nonClassificato)} tone="amber" hint="Giri senza autista o azienda «Altro»" />
-          ) : null}
-          <KpiCard label="Costo totale giornata" value={eurOrDash(costs.total)} />
-        </KpiGrid>
+        <CostBreakdownCards costs={costs} totalLabel="Costo totale giornata" draftCost={costs.draftCost} />
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -220,8 +199,7 @@ export default async function PianificazionePage({
           ) : (
             <ul className="space-y-2">
               {routes.map((r) => {
-                const warnings = getRouteWarnings(r);
-                if (overlapIds.has(r.id)) warnings.push("resource_overlap");
+                const warnings = getRouteWarnings(r, routes);
                 const total = routeTotalPallets(r);
                 const capExceeded =
                   r.vehicle?.capacityPallets != null && total > r.vehicle.capacityPallets;

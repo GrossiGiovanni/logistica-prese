@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/ui/PageHeader";
 import { KpiCard, KpiGrid } from "@/components/ui/KpiCard";
+import { CostBreakdownCards } from "@/components/ui/CostBreakdownCards";
 import { requireBranchId } from "@/lib/branch";
 import { getMonthlyStats } from "@/features/reports/monthly";
 import { formatEuro } from "@/lib/costs";
@@ -69,23 +70,7 @@ export default async function ReportMensilePage({
 
       {/* Costi del mese per voce */}
       <h2 className="mb-2 mt-8 text-base font-semibold text-slate-900">Costi del mese (consuntivo)</h2>
-      <KpiGrid>
-        <KpiCard label="Rama Trasporti" value={eur(stats.costs.rama)} hint="Giri autisti Rama" />
-        <KpiCard label="Omar Trasporti" value={eur(stats.costs.omar)} hint="Giri autisti Omar" />
-        <KpiCard label="Industriale ritiri" value={eur(stats.costs.industrialeRitiri)} hint="Giri autisti Eurosarda" />
-        <KpiCard label="Costo raccolta" value={eur(stats.costs.raccolta)} tone="blue" hint="Rama + Omar + Industriale ritiri" />
-        <KpiCard label="Trazioni" value={eur(stats.costs.trazioni)} hint="Registro trazioni, fuori dalla raccolta" />
-        <KpiCard label="Noli" value={eur(stats.costs.noli)} hint="Noli dei carichi" />
-        {stats.costs.nonClassificato > 0 ? (
-          <KpiCard
-            label="Non classificato"
-            value={eur(stats.costs.nonClassificato)}
-            tone="amber"
-            hint="Giri senza autista o con azienda «Altro»: verificare l'anagrafica"
-          />
-        ) : null}
-        <KpiCard label="Costo totale" value={eur(stats.costs.total)} tone="blue" hint="Raccolta + trazioni + noli" />
-      </KpiGrid>
+      <CostBreakdownCards costs={stats.costs} draftCost={stats.draftCost} />
 
       {/* Forecast a fine mese */}
       <h2 className="mb-2 mt-8 text-base font-semibold text-slate-900">
@@ -116,14 +101,14 @@ export default async function ReportMensilePage({
           hint={`registrato ${eur(stats.costs.raccolta)}`}
         />
         <KpiCard
-          label="Trazioni previste"
-          value={eur(stats.projectedCosts.trazioni)}
-          hint={`registrate ${eur(stats.costs.trazioni)}`}
+          label="Trazioni Eurosarda previste"
+          value={eur(stats.projectedCosts.trazioniIndustriali)}
+          hint={`registrate ${eur(stats.costs.trazioniIndustriali)} · nel Costo Industriale`}
         />
         <KpiCard
-          label="Noli previsti"
-          value={eur(stats.projectedCosts.noli)}
-          hint={`registrati ${eur(stats.costs.noli)}`}
+          label="Noli esterni previsti"
+          value={eur(stats.projectedCosts.noliEsterni)}
+          hint={`registrati ${eur(stats.costs.noliEsterni)}`}
         />
         <KpiCard
           label="Costo totale previsto"

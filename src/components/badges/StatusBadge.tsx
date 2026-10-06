@@ -1,12 +1,17 @@
-import type { PickupStatus, RouteStatus } from "@prisma/client";
-import { pickupStatusLabels, routeStatusLabels } from "@/lib/labels";
+import type { RouteStatus } from "@prisma/client";
+import { routeStatusLabels } from "@/lib/labels";
+import {
+  pickupOperationalStatusLabels,
+  type PickupOperationalStatus,
+} from "@/lib/pickup-status";
 import { Badge, type BadgeTone } from "./Badge";
 
-const pickupTone: Record<PickupStatus, BadgeTone> = {
-  DRAFT: "slate",
-  READY: "blue",
-  PLANNED: "green",
-  CANCELLED: "red",
+// Stato della presa CALCOLATO (giro / dati di carico / annullata), mai salvato a mano.
+const pickupTone: Record<PickupOperationalStatus, BadgeTone> = {
+  DA_COMPLETARE: "slate",
+  PRONTA: "blue",
+  PIANIFICATA: "green",
+  ANNULLATA: "red",
 };
 
 const routeTone: Record<RouteStatus, BadgeTone> = {
@@ -14,8 +19,8 @@ const routeTone: Record<RouteStatus, BadgeTone> = {
   CONFIRMED: "green",
 };
 
-export function PickupStatusBadge({ status }: { status: PickupStatus }) {
-  return <Badge tone={pickupTone[status]}>{pickupStatusLabels[status]}</Badge>;
+export function PickupStatusBadge({ status }: { status: PickupOperationalStatus }) {
+  return <Badge tone={pickupTone[status]}>{pickupOperationalStatusLabels[status]}</Badge>;
 }
 
 export function RouteStatusBadge({ status }: { status: RouteStatus }) {
