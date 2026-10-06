@@ -151,7 +151,7 @@ Su PowerShell usa `$env:DATABASE_URL = "postgresql://..."` al posto di `export`.
   autista Eurosarda (o con vettore marcato «Vettore Eurosarda» in Anagrafica →
   Trazionisti) è una trazione industriale: il nolo va nel **Costo Industriale**.
   Gli altri carichi sono noli esterni. La vecchia sezione «Trazioni» è stata
-  rimossa (tabella `Traction` conservata solo come archivio).
+  rimossa del tutto (anche dal database).
 - **Costi** (Home, Pianificazione, Report mensile, export «Costi e km»): Rama,
   Omar, Costo Industriale (ritiri Eurosarda + trazioni Eurosarda), noli esterni,
   non classificato; le voci sommano sempre il costo totale. Dettagli in

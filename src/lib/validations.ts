@@ -59,7 +59,6 @@ const dateOnly = z
 const vehicleType = z.enum(["VAN", "TRUCK", "BILICO", "MOTRICE"]);
 const costLevel = z.enum(["LOW", "MEDIUM", "HIGH"]);
 const pickupSourceType = z.enum(["SPOT", "RECURRING"]);
-const pickupStatus = z.enum(["DRAFT", "READY", "PLANNED", "CANCELLED"]);
 const timeWindow = z.enum(["MORNING", "AFTERNOON", "ANYTIME", "SPECIFIC"]);
 const priority = z.enum(["NORMAL", "HIGH", "MANDATORY"]);
 const routeShift = z.enum(["MORNING", "AFTERNOON", "FULL_DAY"]);

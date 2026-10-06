@@ -32,13 +32,6 @@ enum PickupSourceType {
   RECURRING
 }
 
-enum PickupStatus {
-  DRAFT
-  READY
-  PLANNED
-  CANCELLED
-}
-
 enum TimeWindow {
   MORNING
   AFTERNOON
@@ -92,7 +85,6 @@ model Branch {
   recurringPickups RecurringPickup[]
   routes           Route[]
   resi             Reso[]
-  tractions        Traction[]
   trailerLogs      TrailerLog[]
   importLogs       ImportLog[]
   carichi          Carico[]
@@ -187,7 +179,6 @@ model Driver {
   defaultVehicle Vehicle?     @relation("DriverDefaultVehicle", fields: [defaultVehicleId], references: [id], onDelete: SetNull)
   routes         Route[]
   trailerLogs    TrailerLog[]
-  tractions      Traction[]
   carichi        Carico[]
 
   @@index([active])
@@ -232,10 +223,6 @@ model Pickup {
   customerId        String
   addressId         String
   sourceType        PickupSourceType @default(SPOT)
-  // DEPRECATO: lo stato operativo ora è CALCOLATO (giro / dati di carico) e non
-  // viene più letto né scritto dall'app. Resta solo durante la transizione e
-  // sarà rimosso con una migrazione dedicata (vedi src/lib/pickup-status.ts).
-  status            PickupStatus     @default(DRAFT)
   // Unico stato persistito: annullamento della presa.
   cancelledAt       DateTime?
   timeWindow        TimeWindow       @default(ANYTIME)
@@ -268,7 +255,6 @@ model Pickup {
   @@unique([pickupDate, recurringPickupId])
   @@index([cancelledAt])
   @@index([pickupDate])
-  @@index([status])
   @@index([sourceType])
   @@index([customerId])
   @@index([pickupNumber])
@@ -362,32 +348,6 @@ model Reso {
 
   @@index([resoDate])
   @@index([customerId])
-  @@index([branchId])
-}
-
-// DEPRECATO: vecchia sezione "Trazioni", sostituita dai Carichi (un carico
-// fatto da Eurosarda è una trazione industriale). Nessun codice la usa più e
-// non entra in alcun costo: la tabella resta solo come archivio fino alla
-// migrazione di pulizia (DROP), da eseguire con backup verificato.
-model Traction {
-  id           String   @id @default(cuid())
-  branchId     String?
-  branch       Branch?  @relation(fields: [branchId], references: [id])
-  tractionDate DateTime @db.Date
-  plate        String?
-  driverId     String?
-  origin       String // punto di partenza
-  destination  String // punto di arrivo
-  km           Float? // km calcolati (o inseriti a mano)
-  cost         Float? // costo della trazione (entra nel costo giornata)
-  notes        String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  driver Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
-
-  @@index([tractionDate])
-  @@index([driverId])
   @@index([branchId])
 }
 

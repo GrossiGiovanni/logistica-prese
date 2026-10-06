@@ -15,8 +15,6 @@ export type PickupStatusInput = {
   pallets: number | null;
   loadingMeters: number | null;
   volumeM3: number | null;
-  /** Vecchio stato salvato: IGNORATO, conta solo la realtà del giro. */
-  storedStatus?: string;
 };
 
 export const pickupOperationalStatusLabels: Record<PickupOperationalStatus, string> = {

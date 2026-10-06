@@ -124,7 +124,7 @@ export async function setPickupTimeWindow(formData: FormData): Promise<void> {
  * Annulla una presa: eliminazione DEFINITIVA (sparisce da liste, pianificazione,
  * dashboard e mappa; se serve di nuovo va ricreata o reimportata).
  * Eccezione tecnica: le prese generate da una ricorrenza vengono marcate
- * CANCELLED (invisibili ovunque) invece di essere cancellate, così la presa
+ * annullate con cancelledAt (invisibili ovunque) invece di essere cancellate, così la presa
  * fissa non viene rigenerata automaticamente per quella stessa data.
  */
 export async function cancelPickup(formData: FormData): Promise<void> {
@@ -141,11 +141,10 @@ export async function cancelPickup(formData: FormData): Promise<void> {
 
   if (pickup.recurringPickupId) {
     // Da ricorrenza: resta come blocco anti-rigenerazione, ma invisibile.
-    // cancelledAt è l'unico stato persistito; "status" è scritto solo per
-    // compatibilità durante la transizione (verrà rimosso con il campo).
+    // cancelledAt è l'unico stato persistito.
     await prisma.$transaction([
       prisma.routeStop.deleteMany({ where: { pickupId: id } }),
-      prisma.pickup.update({ where: { id }, data: { cancelledAt: new Date(), status: "CANCELLED" } }),
+      prisma.pickup.update({ where: { id }, data: { cancelledAt: new Date() } }),
     ]);
   } else {
     // Spot/import: eliminazione definitiva (cascade rimuove le fermate).

@@ -214,31 +214,31 @@ async function main() {
   console.log("📦 Creazione prese spot per domani...");
   const spotData = [
     {
-      customer: customers[1], addrIdx: 0, status: "READY" as const, timeWindow: "MORNING" as const,
+      customer: customers[1], addrIdx: 0, timeWindow: "MORNING" as const,
       pallets: 5, colli: 30, weightKg: 1200, priority: "NORMAL" as const,
       rawNotes: "Bancali EPAL da ritirare al mattino presto.",
     },
     {
-      customer: customers[3], addrIdx: 0, status: "READY" as const, timeWindow: "AFTERNOON" as const,
+      customer: customers[3], addrIdx: 0, timeWindow: "AFTERNOON" as const,
       pallets: 3, priority: "HIGH" as const, requiresTailLift: true,
       rawNotes: "Cliente chiede ritiro pomeriggio.",
     },
     {
       // presa con dati mancanti (no pallets, no note)
-      customer: customers[4], addrIdx: 0, status: "DRAFT" as const, timeWindow: "ANYTIME" as const,
+      customer: customers[4], addrIdx: 0, timeWindow: "ANYTIME" as const,
       priority: "NORMAL" as const,
     },
     {
-      customer: customers[5], addrIdx: 0, status: "READY" as const, timeWindow: "MORNING" as const,
+      customer: customers[5], addrIdx: 0, timeWindow: "MORNING" as const,
       pallets: 8, weightKg: 3000, requiresMotrice: true, priority: "MANDATORY" as const,
       rawNotes: "Carico pesante, valutare motrice.",
     },
     {
-      customer: customers[7], addrIdx: 0, status: "READY" as const, timeWindow: "ANYTIME" as const,
+      customer: customers[7], addrIdx: 0, timeWindow: "ANYTIME" as const,
       pallets: 2, colli: 14, rawNotes: "Ortofrutta, ritiro flessibile.",
     },
     {
-      customer: customers[9], addrIdx: 0, status: "READY" as const, timeWindow: "SPECIFIC" as const,
+      customer: customers[9], addrIdx: 0, timeWindow: "SPECIFIC" as const,
       timeFrom: "09:00", timeTo: "10:30", pallets: 4, rawNotes: "Finestra oraria stretta in mattinata.",
     },
   ];
@@ -250,7 +250,6 @@ async function main() {
         customerId: s.customer.id,
         addressId: s.customer.addresses[s.addrIdx].id,
         sourceType: "SPOT",
-        status: s.status,
         timeWindow: s.timeWindow,
         timeFrom: (s as { timeFrom?: string }).timeFrom,
         timeTo: (s as { timeTo?: string }).timeTo,
@@ -270,7 +269,7 @@ async function main() {
   // GIRI DEMO — 2 giri per domani
   // -------------------------------------------------------------------------
   console.log("🗺️  Creazione giri demo...");
-  // Giro 1 — mattina con furgone, 2 prese assegnate (-> PLANNED)
+  // Giro 1 — mattina con furgone, 2 prese assegnate (stato calcolato: Pianificata)
   const route1 = await prisma.route.create({
     data: {
       routeDate: TOMORROW,
@@ -283,10 +282,6 @@ async function main() {
   });
   await prisma.routeStop.create({ data: { routeId: route1.id, pickupId: createdSpot[0].id, sequence: 1 } });
   await prisma.routeStop.create({ data: { routeId: route1.id, pickupId: createdSpot[4].id, sequence: 2 } });
-  await prisma.pickup.updateMany({
-    where: { id: { in: [createdSpot[0].id, createdSpot[4].id] } },
-    data: { status: "PLANNED" },
-  });
 
   // Giro 2 — giornata intera con motrice, 1 presa pesante assegnata
   const route2 = await prisma.route.create({
@@ -300,10 +295,6 @@ async function main() {
     },
   });
   await prisma.routeStop.create({ data: { routeId: route2.id, pickupId: createdSpot[3].id, sequence: 1 } });
-  await prisma.pickup.update({
-    where: { id: createdSpot[3].id },
-    data: { status: "PLANNED" },
-  });
 
   console.log("✅ Seed completato.");
   console.log(`   Clienti: ${customers.length}`);

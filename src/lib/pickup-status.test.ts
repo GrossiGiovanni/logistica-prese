@@ -54,10 +54,10 @@ describe("stato presa calcolato (nessuno stato operativo salvato a mano)", () =>
     expect(pickupOperationalStatus(annullata)).toBe("ANNULLATA");
   });
 
-  it("uno stato salvato vecchio NON conta: decide la realtà del giro", () => {
-    // Prima: lo stato "PLANNED" restava anche dopo l'uscita dal giro.
-    expect(pickupOperationalStatus(presa({ storedStatus: "PLANNED", routeStopsCount: 0, pallets: 4 }))).toBe("PRONTA");
-    // Prima: lo stato "READY" restava anche dopo l'assegnazione a un giro.
-    expect(pickupOperationalStatus(presa({ storedStatus: "READY", routeStopsCount: 1, pallets: 4 }))).toBe("PIANIFICATA");
+  it("lo stato segue sempre la realtà del giro (nessuno stato salvato da tenere allineato)", () => {
+    // Prima: lo stato "PLANNED" salvato restava anche dopo l'uscita dal giro.
+    expect(pickupOperationalStatus(presa({ routeStopsCount: 0, pallets: 4 }))).toBe("PRONTA");
+    // Prima: lo stato "READY" salvato restava anche dopo l'assegnazione a un giro.
+    expect(pickupOperationalStatus(presa({ routeStopsCount: 1, pallets: 4 }))).toBe("PIANIFICATA");
   });
 });

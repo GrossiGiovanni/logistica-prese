@@ -5,7 +5,6 @@ import type {
   VehicleType,
   CostLevel,
   PickupSourceType,
-  PickupStatus,
   TimeWindow,
   Priority,
   RouteShift,
@@ -28,13 +27,6 @@ export const costLevelLabels: Record<CostLevel, string> = {
 export const pickupSourceLabels: Record<PickupSourceType, string> = {
   SPOT: "Spot",
   RECURRING: "Fissa",
-};
-
-export const pickupStatusLabels: Record<PickupStatus, string> = {
-  DRAFT: "Bozza",
-  READY: "Pronta",
-  PLANNED: "Pianificata",
-  CANCELLED: "Annullata",
 };
 
 export const timeWindowLabels: Record<TimeWindow, string> = {

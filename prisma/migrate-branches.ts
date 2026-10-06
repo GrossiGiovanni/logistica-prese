@@ -37,7 +37,6 @@ async function main() {
     recurringPickups: (await prisma.recurringPickup.updateMany({ where: { branchId: null }, data: { branchId: miId } })).count,
     routes: (await prisma.route.updateMany({ where: { branchId: null }, data: { branchId: miId } })).count,
     resi: (await prisma.reso.updateMany({ where: { branchId: null }, data: { branchId: miId } })).count,
-    tractions: (await prisma.traction.updateMany({ where: { branchId: null }, data: { branchId: miId } })).count,
     trailerLogs: (await prisma.trailerLog.updateMany({ where: { branchId: null }, data: { branchId: miId } })).count,
     importLogs: (await prisma.importLog.updateMany({ where: { branchId: null }, data: { branchId: miId } })).count,
   };

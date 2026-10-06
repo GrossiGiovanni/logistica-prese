@@ -26,8 +26,8 @@ il soft-delete. `capacityPallets` usato per il warning di capacità superata.
 ### Pickup (presa)
 La presa/ritiro di un giorno. Appartiene a `Customer` e `Address`. `sourceType` =
 SPOT | RECURRING. Lo stato operativo è CALCOLATO (vedi sotto); l'unico stato
-salvato è l'annullamento (`cancelledAt`). Il vecchio campo `status` è deprecato:
-non viene più letto né scritto e sarà rimosso con una migrazione dedicata. Può essere
+salvato è l'annullamento (`cancelledAt`); il vecchio campo `status` è stato
+rimosso. Può essere
 collegata opzionalmente a una `RecurringPickup` (campo `recurringPickupId`) per
 tracciare la generazione automatica ed evitare duplicati.
 
@@ -55,10 +55,8 @@ fonte delle trazioni: un carico con autista di azienda `EUROSARDA` oppure con
 vettore marcato `Trazionista.isEurosarda` è una **trazione industriale** e il
 suo nolo entra nel Costo Industriale; gli altri carichi sono **noli esterni**.
 
-### Traction (DEPRECATA)
-Vecchia sezione "Trazioni", sostituita dai Carichi. Nessun codice la usa e non
-entra in alcun costo; la tabella resta come archivio fino a una migrazione di
-pulizia (DROP) da eseguire con backup verificato.
+La vecchia tabella `Traction` (sezione "Trazioni") è stata eliminata: i suoi
+dati restano nei backup precedenti alla migrazione di pulizia.
 
 ## Relazioni (sintesi)
 
@@ -72,7 +70,7 @@ pulizia (DROP) da eseguire con backup verificato.
 
 ## Enum
 
-`VehicleType`, `CostLevel`, `PickupSourceType`, `PickupStatus`, `TimeWindow`,
+`VehicleType`, `CostLevel`, `PickupSourceType`, `DriverCompany`, `TimeWindow`,
 `Priority`, `RouteShift`, `RouteStatus`.
 
 ## Logica di stato delle prese (calcolata)

@@ -161,7 +161,6 @@ async function main() {
     const isFixed = fixedSet.has(`${key(p.mittente)}|${key(p.city)}`);
     if (isFixed) tagged++;
 
-    const hasData = p.pallets != null || p.loadingMeters != null || p.volumeM3 != null;
 
     await prisma.pickup.create({
       data: {
@@ -170,7 +169,6 @@ async function main() {
         customerId,
         addressId,
         sourceType: isFixed ? "RECURRING" : "SPOT",
-        status: hasData ? "READY" : "DRAFT",
         timeWindow: p.timeWindow,
         timeFrom: p.timeFrom ?? undefined,
         pallets: p.pallets ?? undefined,
