@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PickupForm } from "@/features/pickups/PickupForm";
 import { listCustomersWithAddresses } from "@/features/customers/queries";
-import { tomorrowInputValue } from "@/lib/dates";
+import { tomorrowInputValue, safeDateInput } from "@/lib/dates";
 import { requireBranchId } from "@/lib/branch";
 
 export default async function NuovaPresaPage({
@@ -16,7 +16,7 @@ export default async function NuovaPresaPage({
   return (
     <div>
       <PageHeader title="Nuova presa" description="Inserisci una presa spot" />
-      <PickupForm customers={customers} defaultDate={date ?? tomorrowInputValue()} />
+      <PickupForm customers={customers} defaultDate={safeDateInput([date], tomorrowInputValue())} />
     </div>
   );
 }

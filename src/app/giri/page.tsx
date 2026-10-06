@@ -10,7 +10,7 @@ import { getOpDate } from "@/lib/persisted-filters";
 import { requireBranchId } from "@/lib/branch";
 import { routeTotalPallets, routeOccupiedMeters, routeUsesMotrice, getRouteWarnings } from "@/lib/warnings";
 import { routeShiftLabels, routeLabel } from "@/lib/labels";
-import { formatDateIt, tomorrowInputValue, parseDateOnly } from "@/lib/dates";
+import { formatDateIt, tomorrowInputValue, parseDateOnly, safeDateInput } from "@/lib/dates";
 
 export default async function GiriPage({
   searchParams,
@@ -19,7 +19,7 @@ export default async function GiriPage({
 }) {
   const { date } = await searchParams;
   const branchId = await requireBranchId();
-  const selectedDate = date ?? (await getOpDate()) ?? tomorrowInputValue();
+  const selectedDate = safeDateInput([date, await getOpDate()], tomorrowInputValue());
   const routes = await listRoutes(branchId, selectedDate);
 
   return (

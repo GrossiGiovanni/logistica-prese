@@ -14,7 +14,9 @@ indirizzi (es. Sede principale, Magazzino, Produzione). Nessun geocoding.
 
 ### Driver (autista)
 Anagrafica autista. Può avere un `defaultVehicle` (mezzo predefinito). `active`
-per il soft-delete.
+per il soft-delete. `company` = EUROSARDA | RAMA | OMAR | ALTRO decide la voce di
+costo dei suoi giri (Industriale ritiri / Rama Trasporti / Omar Trasporti /
+non classificato). `isEurosarda` è derivato da `company` e non va usato nei calcoli.
 
 ### Vehicle (mezzo)
 Parco mezzi. `vehicleType` = VAN | TRUCK | MOTRICE. `costLevel` = LOW | MEDIUM |
@@ -64,6 +66,22 @@ Vincolo unico `@@unique([routeId, pickupId])`.
 - Assegnazione a un giro: la presa passa a `PLANNED`.
 - Rimozione da un giro (se non in altri giri): torna a `READY` o `DRAFT` in base ai dati.
 - Annullamento: `CANCELLED` (soft) e rimozione da eventuali giri.
+
+## Report mensile (consuntivo e forecast)
+
+Calcoli in [`src/features/reports/monthly-calc.ts`](../src/features/reports/monthly-calc.ts),
+test in `monthly-calc.test.ts` (`npm test`).
+
+- **Oggi** = giorno di calendario a Roma (`Europe/Rome`).
+- **Consuntivo**: solo date fino a oggi e solo giri `CONFIRMED`; i giri in bozza
+  sono mostrati a parte.
+- **Prese effettuate**: prese distinte nei giri confermati del periodo, anche se
+  con data presa precedente (arretrate).
+- **Costo raccolta** = Rama + Omar + Industriale ritiri. Trazioni e noli sono
+  voci separate; giri senza autista o con azienda «Altro» → «non classificato».
+- **Forecast**: registrato + per ogni giorno lavorativo rimanente il pianificato
+  (giri confermati, trazioni, noli già registrati) oppure la media per giorno
+  lavorativo trascorso: mai entrambi.
 
 ## Dati mancanti
 

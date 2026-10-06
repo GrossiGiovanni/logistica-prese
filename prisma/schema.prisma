@@ -63,6 +63,15 @@ enum RouteStatus {
   CONFIRMED
 }
 
+// Azienda di appartenenza dell'autista: decide in quale voce di costo finiscono
+// i suoi giri (Rama / Omar = padroncini, Eurosarda = industriale ritiri).
+enum DriverCompany {
+  EUROSARDA
+  RAMA
+  OMAR
+  ALTRO
+}
+
 // =============================================================================
 // MODELS
 // =============================================================================
@@ -162,9 +171,10 @@ model Driver {
   code             String?
   phone            String? // Telefono/WhatsApp in formato internazionale (es. +39...)
   whatsappEnabled  Boolean  @default(true)
-  // Autista Eurosarda (flotta propria): compare nella sezione dedicata e i suoi
-  // costi (giri e trazioni) sono classificati come "industriali"; gli altri
-  // autisti sono padroncini/esterni.
+  // Azienda dell'autista: unica fonte per la classificazione dei costi dei giri.
+  company          DriverCompany @default(ALTRO)
+  // Derivato da company (= EUROSARDA), mantenuto allineato in scrittura per
+  // compatibilità. Non usarlo per i calcoli.
   isEurosarda      Boolean  @default(false)
   defaultVehicleId String?
   active           Boolean  @default(true)

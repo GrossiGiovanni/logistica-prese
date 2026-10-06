@@ -64,6 +64,7 @@ const timeWindow = z.enum(["MORNING", "AFTERNOON", "ANYTIME", "SPECIFIC"]);
 const priority = z.enum(["NORMAL", "HIGH", "MANDATORY"]);
 const routeShift = z.enum(["MORNING", "AFTERNOON", "FULL_DAY"]);
 const routeStatus = z.enum(["DRAFT", "CONFIRMED"]);
+const driverCompany = z.enum(["EUROSARDA", "RAMA", "OMAR", "ALTRO"]);
 
 // ---------------------------------------------------------------------------
 // Customer
@@ -108,7 +109,7 @@ export const driverSchema = z.object({
   code: optionalString,
   phone: optionalString,
   whatsappEnabled: checkbox,
-  isEurosarda: checkbox,
+  company: driverCompany,
   defaultVehicleId: optionalString,
   active: checkbox,
   notes: optionalString,

@@ -5,7 +5,7 @@
 // Riferimenti cliente: BILICO 400€/giorno, MOTRICE 300€/giorno
 // (200+200 / 150+150, cioè metà per la sola mattina o il solo pomeriggio).
 
-import type { Vehicle, Route, RouteShift } from "@prisma/client";
+import type { Vehicle, Route, RouteShift, RouteStatus } from "@prisma/client";
 
 type RouteCostInput = Pick<Route, "shift" | "km"> & {
   vehicle: Pick<Vehicle, "dailyCost" | "costPerKm"> | null;
@@ -38,26 +38,81 @@ export function routeTotalCost(route: RouteCostInput): number | null {
   return (fixed ?? 0) + (km ?? 0);
 }
 
-/**
- * Ripartizione dei costi tra "industriale" e "padroncini".
- * Industriale = costi degli autisti marcati come tali in anagrafica
- * (flag separati per giri e trazioni). Padroncini = tutto il resto dei costi
- * esterni: calcolato come differenza dal totale, così non ci sono doppi conteggi.
- */
-export type CostSplit = { industrial: number; padroncini: number; total: number };
+/** Azienda dell'autista (stessi valori dell'enum Prisma DriverCompany). */
+export type DriverCompanyKey = "EUROSARDA" | "RAMA" | "OMAR" | "ALTRO";
 
-export function splitCosts(args: {
-  routes: { cost: number; industrial: boolean }[];
-  tractions: { cost: number; industrial: boolean }[];
-  /** Altri costi esterni (es. noli dei carichi): sempre lato padroncini. */
-  otherExternal?: number;
-}): CostSplit {
-  const sum = (xs: { cost: number }[]) => xs.reduce((s, x) => s + x.cost, 0);
-  const industrial =
-    sum(args.routes.filter((r) => r.industrial)) +
-    sum(args.tractions.filter((t) => t.industrial));
-  const total = sum(args.routes) + sum(args.tractions) + (args.otherExternal ?? 0);
-  return { industrial, padroncini: total - industrial, total };
+export const driverCompanyLabels: Record<DriverCompanyKey, string> = {
+  EUROSARDA: "Eurosarda",
+  RAMA: "Rama Trasporti",
+  OMAR: "Omar Trasporti",
+  ALTRO: "Altro / non classificato",
+};
+
+type CostRouteInput = RouteCostInput & {
+  status: RouteStatus;
+  driver: { company: DriverCompanyKey } | null;
+};
+
+/**
+ * Ripartizione dei costi per voce.
+ * - rama / omar / industrialeRitiri: costo dei giri CONFERMATI, per azienda
+ *   dell'autista (non per nome né per il vecchio flag Eurosarda).
+ * - raccolta = rama + omar + industrialeRitiri.
+ * - nonClassificato: giri confermati senza autista o con azienda "Altro":
+ *   fuori dalla raccolta ma nel totale, da sistemare in anagrafica.
+ * - trazioni e noli: voci separate, mai nella raccolta.
+ * I giri in bozza sono esclusi (vedi draftRoutesCost).
+ */
+export type CostBreakdown = {
+  rama: number;
+  omar: number;
+  industrialeRitiri: number;
+  raccolta: number;
+  nonClassificato: number;
+  trazioni: number;
+  noli: number;
+  total: number;
+};
+
+export function emptyCostBreakdown(): CostBreakdown {
+  return { rama: 0, omar: 0, industrialeRitiri: 0, raccolta: 0, nonClassificato: 0, trazioni: 0, noli: 0, total: 0 };
+}
+
+export function computeCostBreakdown(args: {
+  routes: CostRouteInput[];
+  tractions: { cost: number | null }[];
+  carichi: { nolo: number | null }[];
+}): CostBreakdown {
+  const out = emptyCostBreakdown();
+  for (const r of args.routes) {
+    if (r.status !== "CONFIRMED") continue;
+    const cost = routeTotalCost(r) ?? 0;
+    switch (r.driver?.company) {
+      case "RAMA":
+        out.rama += cost;
+        break;
+      case "OMAR":
+        out.omar += cost;
+        break;
+      case "EUROSARDA":
+        out.industrialeRitiri += cost;
+        break;
+      default:
+        out.nonClassificato += cost;
+    }
+  }
+  out.trazioni = args.tractions.reduce((s, t) => s + (t.cost ?? 0), 0);
+  out.noli = args.carichi.reduce((s, c) => s + (c.nolo ?? 0), 0);
+  out.raccolta = out.rama + out.omar + out.industrialeRitiri;
+  out.total = out.raccolta + out.nonClassificato + out.trazioni + out.noli;
+  return out;
+}
+
+/** Costo dei giri ancora in bozza (escluso dal consuntivo, mostrato a parte). */
+export function draftRoutesCost(routes: CostRouteInput[]): number {
+  return routes
+    .filter((r) => r.status === "DRAFT")
+    .reduce((s, r) => s + (routeTotalCost(r) ?? 0), 0);
 }
 
 const euro = new Intl.NumberFormat("it-IT", {

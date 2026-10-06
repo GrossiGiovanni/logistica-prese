@@ -10,7 +10,7 @@ import { cancelPickup } from "@/features/pickups/actions";
 import { PickupFiltersBar } from "@/features/pickups/PickupFilters";
 import { hasMissingData } from "@/lib/warnings";
 import { pickupSourceLabels, timeWindowLabels, priorityLabels, routeStatusLabels, routeLabel } from "@/lib/labels";
-import { formatDateIt, todayInputValue, addDaysInput, parseDateOnly } from "@/lib/dates";
+import { formatDateIt, todayInputValue, addDaysInput, parseDateOnly, safeDateInput } from "@/lib/dates";
 import { getPreseFilters, getOpDate } from "@/lib/persisted-filters";
 import { requireBranchId } from "@/lib/branch";
 import { RouteStatusBadge } from "@/components/badges/StatusBadge";
@@ -27,7 +27,7 @@ export default async function PresePage({
   // Vista per giornata: una data è sempre selezionata. Quando c'è una ricerca,
   // si cerca su TUTTE le date (così trovi una presa qualsiasi e il suo giro).
   const searching = Boolean(saved.search);
-  const viewDate = sp.date || opDate || todayInputValue();
+  const viewDate = safeDateInput([sp.date, opDate], todayInputValue());
 
   const filters = {
     date: searching ? undefined : viewDate,

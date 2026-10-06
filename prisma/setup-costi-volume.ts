@@ -15,7 +15,7 @@ const prisma = new PrismaClient();
 async function main() {
   // Autisti che generano costo industriale (flotta Eurosarda).
   const eurosarda = await prisma.driver.findMany({
-    where: { isEurosarda: true },
+    where: { company: "EUROSARDA" },
     select: { name: true, active: true },
     orderBy: { name: "asc" },
   });

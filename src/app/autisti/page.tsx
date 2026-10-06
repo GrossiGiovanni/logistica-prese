@@ -6,6 +6,7 @@ import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { listDrivers } from "@/features/drivers/queries";
 import { deleteDriver } from "@/features/drivers/actions";
 import { requireBranchId } from "@/lib/branch";
+import { driverCompanyLabels } from "@/lib/costs";
 
 type Row = Awaited<ReturnType<typeof listDrivers>>[number];
 
@@ -26,11 +27,12 @@ export default async function AutistiPage({
           <Link href={`/autisti/${d.id}/modifica`} className="font-medium text-brand-700 hover:underline">
             {d.name}
           </Link>
-          {d.isEurosarda ? <Badge tone="blue">Eurosarda</Badge> : null}
+          {d.company === "EUROSARDA" ? <Badge tone="blue">Eurosarda</Badge> : null}
           {!d.active ? <Badge tone="slate">Inattivo</Badge> : null}
         </div>
       ),
     },
+    { header: "Azienda", cell: (d) => driverCompanyLabels[d.company] },
     { header: "Codice", cell: (d) => d.code ?? "—" },
     { header: "Telefono", cell: (d) => d.phone ?? "—" },
     { header: "Mezzo predefinito", cell: (d) => d.defaultVehicle?.name ?? "—" },

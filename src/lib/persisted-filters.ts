@@ -4,14 +4,16 @@
 // I cookie restano finché l'utente non li azzera manualmente (vedi filter-actions).
 
 import { cookies } from "next/headers";
+import { isValidDateInput } from "@/lib/dates";
 
 export const OP_DATE_COOKIE = "op_date";
 export const PRESE_FILTERS_COOKIE = "f_prese";
 export const PIAN_FILTERS_COOKIE = "f_pian";
 
-/** Data operativa memorizzata (o undefined). */
+/** Data operativa memorizzata (o undefined se assente o non valida). */
 export async function getOpDate(): Promise<string | undefined> {
-  return (await cookies()).get(OP_DATE_COOKIE)?.value || undefined;
+  const value = (await cookies()).get(OP_DATE_COOKIE)?.value;
+  return isValidDateInput(value) ? value : undefined;
 }
 
 export type PreseFilterState = {

@@ -6,6 +6,7 @@ import { upsertDriver } from "./actions";
 import { FormSection, Field, CheckboxField } from "@/components/forms/FormSection";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import type { ActionResult } from "@/lib/validations";
+import { driverCompanyLabels, type DriverCompanyKey } from "@/lib/costs";
 
 export function DriverForm({
   driver,
@@ -48,16 +49,20 @@ export function DriverForm({
           </select>
         </Field>
         <Field
-          label="Stato"
-          hint="«Autista Eurosarda» = flotta propria: i suoi costi (giri e trazioni) sono conteggiati come costo industriale, gli altri come padroncini."
+          label="Azienda *"
+          htmlFor="company"
+          error={errors?.company}
+          hint="Decide la voce di costo dei suoi giri: Rama / Omar Trasporti oppure Industriale ritiri (Eurosarda). «Altro» finisce in «non classificato»."
         >
+          <select id="company" name="company" defaultValue={driver?.company ?? "ALTRO"} required className="field-input">
+            {(Object.keys(driverCompanyLabels) as DriverCompanyKey[]).map((c) => (
+              <option key={c} value={c}>{driverCompanyLabels[c]}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Stato">
           <div className="flex flex-wrap gap-6 pt-2">
             <CheckboxField label="Attivo" name="active" defaultChecked={driver?.active ?? true} />
-            <CheckboxField
-              label="Autista Eurosarda"
-              name="isEurosarda"
-              defaultChecked={driver?.isEurosarda ?? false}
-            />
           </div>
         </Field>
         <Field label="Note" htmlFor="notes" error={errors?.notes} full>

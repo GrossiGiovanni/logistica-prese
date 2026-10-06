@@ -26,7 +26,7 @@ import {
   routeShiftLabels,
   routeLabel,
 } from "@/lib/labels";
-import { formatDateIt, tomorrowInputValue, parseDateOnly, toDateInputValue } from "@/lib/dates";
+import { formatDateIt, tomorrowInputValue, parseDateOnly, toDateInputValue, safeDateInput } from "@/lib/dates";
 
 // Palette colori dei giri (ciclica)
 const COLORS = [
@@ -79,7 +79,7 @@ export default async function PianificazionePlusPage({
 }) {
   const { date } = await searchParams;
   const branchId = await requireBranchId();
-  const selectedDate = date ?? (await getOpDate()) ?? tomorrowInputValue();
+  const selectedDate = safeDateInput([date, await getOpDate()], tomorrowInputValue());
 
   await ensureRecurringForDate(selectedDate);
 

@@ -15,7 +15,12 @@ export async function upsertDriver(
   if (!parsed.success) return parsed.result;
 
   const { defaultVehicleId, ...rest } = parsed.data;
-  const data = { ...rest, defaultVehicleId: defaultVehicleId ?? null };
+  // isEurosarda è derivato dall'azienda (unica fonte per i costi).
+  const data = {
+    ...rest,
+    isEurosarda: rest.company === "EUROSARDA",
+    defaultVehicleId: defaultVehicleId ?? null,
+  };
 
   if (id) {
     await prisma.driver.update({ where: { id }, data });

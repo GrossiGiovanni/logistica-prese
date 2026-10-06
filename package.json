@@ -14,7 +14,8 @@
     "db:migrate:status": "prisma migrate status",
     "db:migrate:deploy": "tsx prisma/deploy-migrations.ts",
     "db:backup": "tsx prisma/backup.ts",
-    "db:backup:verify": "tsx prisma/verify-backup.ts"
+    "db:backup:verify": "tsx prisma/verify-backup.ts",
+    "test": "tsx --test \"src/**/*.test.ts\""
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

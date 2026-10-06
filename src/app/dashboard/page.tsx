@@ -8,6 +8,7 @@ import { todayInputValue } from "@/lib/dates";
 
 const nf1 = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1 });
 const nf0 = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 0 });
+const eur = (v: number) => (v > 0 ? formatEuro(Math.round(v)) : "—");
 
 export default async function DashboardPage({
   searchParams,
@@ -16,7 +17,7 @@ export default async function DashboardPage({
 }) {
   const { month } = await searchParams;
   const branchId = await requireBranchId();
-  const stats = await getMonthlyStats(branchId, month ?? "");
+  const stats = await getMonthlyStats(branchId, month);
   const today = todayInputValue();
 
   const volLabel = (v: number) => `${nf1.format(Math.round(v * 10) / 10)} m³`;
@@ -39,17 +40,21 @@ export default async function DashboardPage({
       {/* KPI operativi del mese */}
       <KpiGrid>
         <KpiCard
-          label="Prese del mese"
+          label="Prese effettuate"
           value={nf0.format(stats.pickupsCount)}
-          hint={`≈ ${nf1.format(stats.avgPickupsPerDay)} / giorno operativo`}
+          hint={`≈ ${nf1.format(stats.avgPickupsPerDay)} / giorno operativo · fino a oggi`}
         />
         <KpiCard
           label="Volume tassabile"
           value={volLabel(stats.volumeM3)}
           hint="Consuntivo da import AS400"
         />
-        <KpiCard label="Giri del mese" value={nf0.format(stats.routesCount)} />
-        <KpiCard label="Pallet del mese" value={nf0.format(stats.pallets)} />
+        <KpiCard
+          label="Giri confermati"
+          value={nf0.format(stats.routesCount)}
+          hint={stats.draftRoutesCount > 0 ? `+ ${stats.draftRoutesCount} in bozza (esclusi)` : undefined}
+        />
+        <KpiCard label="Pallet equivalenti" value={nf0.format(Math.round(stats.pallets))} hint="Pallet o MTL × 2,5" />
         <KpiCard label="Mezzi medi / giorno" value={nf1.format(stats.avgVehiclesPerDay)} />
         <KpiCard
           label="Giorni operativi"
@@ -58,29 +63,19 @@ export default async function DashboardPage({
         />
       </KpiGrid>
 
-      {/* Costi del mese, separati per tipologia */}
-      <h2 className="mb-2 mt-8 text-base font-semibold text-slate-900">Costi del mese</h2>
+      {/* Costi del mese, separati per voce */}
+      <h2 className="mb-2 mt-8 text-base font-semibold text-slate-900">Costi del mese (fino a oggi)</h2>
       <KpiGrid>
-        <KpiCard
-          label="Costo padroncini"
-          value={stats.costSplit.padroncini > 0 ? formatEuro(Math.round(stats.costSplit.padroncini)) : "—"}
-          hint="Giri e trazioni esterni + noli"
-        />
-        <KpiCard
-          label="Costo industriale"
-          value={stats.costSplit.industrial > 0 ? formatEuro(Math.round(stats.costSplit.industrial)) : "—"}
-          hint="Giri e trazioni autisti Eurosarda"
-        />
-        <KpiCard
-          label="Costo totale"
-          value={stats.costSplit.total > 0 ? formatEuro(Math.round(stats.costSplit.total)) : "—"}
-          tone="blue"
-        />
-        <KpiCard
-          label="Costo raccolta previsto"
-          value={stats.projectedCost > 0 ? formatEuro(Math.round(stats.projectedCost)) : "—"}
-          hint="Registrato + proiezione fine mese"
-        />
+        <KpiCard label="Rama Trasporti" value={eur(stats.costs.rama)} />
+        <KpiCard label="Omar Trasporti" value={eur(stats.costs.omar)} />
+        <KpiCard label="Industriale ritiri" value={eur(stats.costs.industrialeRitiri)} hint="Giri autisti Eurosarda" />
+        <KpiCard label="Costo raccolta" value={eur(stats.costs.raccolta)} tone="blue" hint="Rama + Omar + Industriale ritiri" />
+        <KpiCard label="Trazioni" value={eur(stats.costs.trazioni)} />
+        <KpiCard label="Noli" value={eur(stats.costs.noli)} />
+        {stats.costs.nonClassificato > 0 ? (
+          <KpiCard label="Non classificato" value={eur(stats.costs.nonClassificato)} tone="amber" hint="Verificare l'azienda degli autisti" />
+        ) : null}
+        <KpiCard label="Costo totale" value={eur(stats.costs.total)} hint="Raccolta + trazioni + noli" />
       </KpiGrid>
 
       {/* Classifiche + forecast */}
@@ -145,7 +140,7 @@ export default async function DashboardPage({
             <div className="flex items-center justify-between">
               <dt className="text-slate-500">Costo raccolta previsto</dt>
               <dd className="font-semibold text-brand-700">
-                {stats.projectedCost > 0 ? formatEuro(Math.round(stats.projectedCost)) : "—"}
+                {eur(stats.projectedCosts.raccolta)}
               </dd>
             </div>
           </dl>

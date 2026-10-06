@@ -33,7 +33,7 @@ export function listActiveDrivers(branchId: string) {
 /** Autisti attivi con flag "Autista Eurosarda" (sezione dedicata). */
 export function listEurosardaDrivers(branchId: string) {
   return prisma.driver.findMany({
-    where: { branchId, active: true, isEurosarda: true },
+    where: { branchId, active: true, company: "EUROSARDA" },
     orderBy: { name: "asc" },
   });
 }

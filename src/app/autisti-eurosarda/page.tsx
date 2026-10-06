@@ -30,7 +30,7 @@ export default async function AutistiEurosardaPage({
       where: {
         branchId,
         logDate: { gte: parseDateOnly(from), lte: parseDateOnly(to) },
-        driver: { isEurosarda: true },
+        driver: { company: "EUROSARDA" },
         ...(driverId ? { driverId } : {}),
       },
       include: { driver: { select: { name: true } } },

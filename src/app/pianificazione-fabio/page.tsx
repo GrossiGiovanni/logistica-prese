@@ -6,7 +6,7 @@
 import { PageHeader } from "@/components/ui/PageHeader";
 import { requireBranchId, listBranches } from "@/lib/branch";
 import { getOpDate } from "@/lib/persisted-filters";
-import { tomorrowInputValue, isValidDateInput } from "@/lib/dates";
+import { tomorrowInputValue, isValidDateInput, safeDateInput } from "@/lib/dates";
 import { getQuadrantData, type QuadrantFilters } from "@/features/plan-fabio/queries";
 import { Quadrant } from "@/features/plan-fabio/Quadrant";
 import type { QuadrantCurrent } from "@/features/plan-fabio/QuadrantFilters";
@@ -23,7 +23,7 @@ export default async function PianificazioneFabioPage({
     getOpDate(),
   ]);
   const activeIds = new Set(branches.map((b) => b.id));
-  const baseDate = opDate ?? tomorrowInputValue();
+  const baseDate = safeDateInput([opDate], tomorrowInputValue());
 
   // Estrae i filtri del quadrante q dai parametri "qN_*" dell'URL.
   function parse(q: number): { filters: QuadrantFilters; current: QuadrantCurrent } {

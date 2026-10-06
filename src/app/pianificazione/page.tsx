@@ -23,9 +23,9 @@ import {
   hasMissingData,
 } from "@/lib/warnings";
 import { routeTotalCost, formatEuro } from "@/lib/costs";
-import { getDailyCostSplit } from "@/features/reports/daily";
+import { getDailyCosts } from "@/features/reports/daily";
 import { routeShiftLabels, priorityLabels, routeLabel } from "@/lib/labels";
-import { formatDateIt, tomorrowInputValue, parseDateOnly, toDateInputValue } from "@/lib/dates";
+import { formatDateIt, tomorrowInputValue, parseDateOnly, toDateInputValue, safeDateInput } from "@/lib/dates";
 import { UnassignedFilters } from "@/features/pickups/UnassignedFilters";
 import { PickupShiftSelect } from "@/features/pickups/PickupShiftSelect";
 import { WhatsAppButton } from "@/features/routes/WhatsAppButton";
@@ -37,6 +37,8 @@ import {
 import { getPianFilters, getOpDate } from "@/lib/persisted-filters";
 import type { TimeWindow, Priority } from "@prisma/client";
 
+const eurOrDash = (v: number) => (v > 0 ? formatEuro(Math.round(v)) : "—");
+
 export default async function PianificazionePage({
   searchParams,
 }: {
@@ -45,7 +47,7 @@ export default async function PianificazionePage({
   const { date } = await searchParams;
   const [saved, opDate, branchId] = await Promise.all([getPianFilters(), getOpDate(), requireBranchId()]);
   const { q, tw, prio } = saved;
-  const selectedDate = date ?? opDate ?? tomorrowInputValue();
+  const selectedDate = safeDateInput([date, opDate], tomorrowInputValue());
   const redirectTo = `/pianificazione?date=${selectedDate}`;
 
   // Materializza le prese fisse del giorno (idempotente). I giri NON sono
@@ -75,7 +77,7 @@ export default async function PianificazionePage({
   const overlapIds = findResourceOverlaps(routes.filter((r) => r.stops.length > 0));
 
   // Costi della giornata ripartiti (stessa logica dei report mensili).
-  const costs = await getDailyCostSplit(branchId, selectedDate);
+  const costs = await getDailyCosts(branchId, selectedDate);
 
   return (
     <div>
@@ -107,22 +109,24 @@ export default async function PianificazionePage({
         <KpiCard label="Motrici usate" value={kpi.motriciUsed} tone={kpi.motriciUsed > 0 ? "red" : "default"} />
       </KpiGrid>
 
-      {/* Costi della giornata, separati per tipologia */}
+      {/* Costi della giornata per voce (giri confermati; le bozze a parte) */}
       <div className="mt-3">
         <KpiGrid>
+          <KpiCard label="Rama Trasporti" value={eurOrDash(costs.rama)} />
+          <KpiCard label="Omar Trasporti" value={eurOrDash(costs.omar)} />
+          <KpiCard label="Industriale ritiri" value={eurOrDash(costs.industrialeRitiri)} />
           <KpiCard
-            label="Costo padroncini"
-            value={costs.padroncini > 0 ? formatEuro(Math.round(costs.padroncini)) : "—"}
-          />
-          <KpiCard
-            label="Costo industriale"
-            value={costs.industrial > 0 ? formatEuro(Math.round(costs.industrial)) : "—"}
-          />
-          <KpiCard
-            label="Costo totale giornata"
-            value={costs.total > 0 ? formatEuro(Math.round(costs.total)) : "—"}
+            label="Costo raccolta"
+            value={eurOrDash(costs.raccolta)}
             tone="blue"
+            hint={costs.draftCost > 0 ? `+ ${formatEuro(Math.round(costs.draftCost))} in giri in bozza (esclusi)` : "Rama + Omar + Industriale ritiri"}
           />
+          <KpiCard label="Trazioni" value={eurOrDash(costs.trazioni)} />
+          <KpiCard label="Noli" value={eurOrDash(costs.noli)} />
+          {costs.nonClassificato > 0 ? (
+            <KpiCard label="Non classificato" value={eurOrDash(costs.nonClassificato)} tone="amber" hint="Giri senza autista o azienda «Altro»" />
+          ) : null}
+          <KpiCard label="Costo totale giornata" value={eurOrDash(costs.total)} />
         </KpiGrid>
       </div>
 

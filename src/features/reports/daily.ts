@@ -1,44 +1,34 @@
-// Costi della singola giornata, ripartiti tra padroncini e industriale.
-// Usa la stessa logica del mensile (routeTotalCost + splitCosts), così i due
-// livelli non possono divergere.
+// Costi della singola giornata, per voce (Rama / Omar / Industriale ritiri /
+// trazioni / noli). Usa la stessa funzione del mensile (computeCostBreakdown),
+// così la somma dei giorni coincide con il mese.
 
 import { prisma } from "@/lib/db";
 import { parseDateOnly } from "@/lib/dates";
-import { routeTotalCost, splitCosts, type CostSplit } from "@/lib/costs";
+import { computeCostBreakdown, draftRoutesCost, type CostBreakdown } from "@/lib/costs";
 
-/** Ripartizione costi del giorno: giri + trazioni + noli dei carichi. */
-export async function getDailyCostSplit(branchId: string, dateStr: string): Promise<CostSplit> {
+export type DailyCosts = CostBreakdown & { draftCost: number };
+
+/** Costi del giorno: giri confermati + trazioni + noli; le bozze a parte. */
+export async function getDailyCosts(branchId: string, dateStr: string): Promise<DailyCosts> {
   const date = parseDateOnly(dateStr);
 
   const [routes, tractions, carichi] = await Promise.all([
     prisma.route.findMany({
       where: { branchId, routeDate: date },
       select: {
+        status: true,
         shift: true,
         km: true,
         vehicle: { select: { dailyCost: true, costPerKm: true } },
-        driver: { select: { isEurosarda: true } },
+        driver: { select: { company: true } },
       },
     }),
-    prisma.traction.findMany({
-      where: { branchId, tractionDate: date },
-      select: { cost: true, driver: { select: { isEurosarda: true } } },
-    }),
-    prisma.carico.findMany({
-      where: { branchId, loadDate: date },
-      select: { nolo: true },
-    }),
+    prisma.traction.findMany({ where: { branchId, tractionDate: date }, select: { cost: true } }),
+    prisma.carico.findMany({ where: { branchId, loadDate: date }, select: { nolo: true } }),
   ]);
 
-  return splitCosts({
-    routes: routes.map((r) => ({
-      cost: routeTotalCost(r) ?? 0,
-      industrial: r.driver?.isEurosarda ?? false,
-    })),
-    tractions: tractions.map((t) => ({
-      cost: t.cost ?? 0,
-      industrial: t.driver?.isEurosarda ?? false,
-    })),
-    otherExternal: carichi.reduce((s, c) => s + (c.nolo ?? 0), 0),
-  });
+  return {
+    ...computeCostBreakdown({ routes, tractions, carichi }),
+    draftCost: draftRoutesCost(routes),
+  };
 }

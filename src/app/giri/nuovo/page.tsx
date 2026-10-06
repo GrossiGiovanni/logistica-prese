@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { RouteForm } from "@/features/routes/RouteForm";
 import { listActiveDrivers } from "@/features/drivers/queries";
 import { listActiveVehicles } from "@/features/vehicles/queries";
-import { tomorrowInputValue } from "@/lib/dates";
+import { tomorrowInputValue, safeDateInput } from "@/lib/dates";
 import { requireBranchId } from "@/lib/branch";
 
 export default async function NuovoGiroPage({
@@ -23,7 +23,7 @@ export default async function NuovoGiroPage({
       <RouteForm
         drivers={drivers}
         vehicles={vehicles}
-        defaultDate={date ?? tomorrowInputValue()}
+        defaultDate={safeDateInput([date], tomorrowInputValue())}
       />
     </div>
   );
